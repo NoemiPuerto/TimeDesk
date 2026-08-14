@@ -1,0 +1,85 @@
+@import "tailwindcss";
+
+@custom-variant dark (&:is(.dark *));
+
+:root {
+  --background: #fef9ed;
+  --surface: #fef9ed;
+  --surface-container-lowest: #ffffff;
+  --surface-container-low: #f8f3e7;
+  --surface-container: #f3ede1;
+  --surface-container-high: #ede8dc;
+  --surface-container-highest: #e7e2d6;
+  --on-background: #1d1c14;
+  --on-surface: #1d1c14;
+  --on-surface-variant: #44483f;
+  --outline: #75786e;
+  --outline-variant: #c4c8bc;
+  --primary: #4f653e;
+  --primary-container: #859c71;
+  --on-primary: #ffffff;
+  --secondary: #556344;
+  --secondary-container: #d5e5be;
+  --error: #ba1a1a;
+
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 16px;
+  --radius-full: 9999px;
+}
+
+.dark {
+  --background: #111410;
+  --surface: #111410;
+  --surface-container-lowest: #0c0f0b;
+  --surface-container-low: #191c18;
+  --surface-container: #1d201c;
+  --surface-container-high: #282b26;
+  --surface-container-highest: #333630;
+  --on-background: #e1e3db;
+  --on-surface: #e1e3db;
+  --on-surface-variant: #c4c8bc;
+  --outline: #8e9287;
+  --outline-variant: #44483f;
+  --primary: #b6cea0;
+  --primary-container: #859c71;
+  --on-primary: #223514;
+  --secondary: #c0cab3;
+  --secondary-container: #434c3b;
+  --error: #ffb4ab;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-surface: var(--surface);
+  --color-surface-container-lowest: var(--surface-container-lowest);
+  --color-surface-container-low: var(--surface-container-low);
+  --color-surface-container: var(--surface-container);
+  --color-surface-container-high: var(--surface-container-high);
+  --color-surface-container-highest: var(--surface-container-highest);
+  --color-on-background: var(--on-background);
+  --color-on-surface: var(--on-surface);
+  --color-on-surface-variant: var(--on-surface-variant);
+  --color-outline: var(--outline);
+  --color-outline-variant: var(--outline-variant);
+  --color-primary: var(--primary);
+  --color-primary-container: var(--primary-container);
+  --color-on-primary: var(--on-primary);
+  --color-secondary: var(--secondary);
+  --color-secondary-container: var(--secondary-container);
+  --color-error: var(--error);
+
+  --radius-sm: var(--radius-sm);
+  --radius-md: var(--radius-md);
+  --radius-lg: var(--radius-lg);
+  --radius-full: var(--radius-full);
+
+  --font-sans: "Inter Variable", "Inter", sans-serif;
+}
+
+body {
+  margin: 0;
+  background-color: var(--color-background);
+  color: var(--color-on-background);
+  font-family: var(--font-sans);
+}
