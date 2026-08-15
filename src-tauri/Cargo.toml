@@ -1,6 +1,6 @@
 [package]
 name = "timedesk"
-version = "0.1.0"
+version = "0.1.1"
 description = "TimeDesk - time tracking y productividad para freelancers y equipos pequeños"
 authors = ["you"]
 edition = "2021"
