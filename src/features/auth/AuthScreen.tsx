@@ -12,9 +12,7 @@ function AuthShell({ children }: { children: React.ReactNode }) {
 function AuthHeader({ subtitle }: { subtitle: string }) {
   return (
     <div className="flex flex-col items-center gap-2">
-      <div className="w-12 h-12 rounded-md bg-primary-container flex items-center justify-center text-on-primary font-bold text-lg">
-        TD
-      </div>
+      <img src="/favicon.svg" alt="TimeDesk" className="w-14 h-14" />
       <h1 className="text-2xl font-bold tracking-tight">TimeDesk</h1>
       <p className="text-on-surface-variant text-sm text-center">{subtitle}</p>
     </div>
