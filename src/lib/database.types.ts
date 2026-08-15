@@ -402,6 +402,23 @@ export type Database = {
         Args: { p_project_id: string; p_user_id: string }
         Returns: boolean
       }
+      start_task_timer: {
+        Args: { p_task_id: string }
+        Returns: {
+          ended_at: string | null
+          id: string
+          project_id: string
+          started_at: string
+          task_id: string
+          user_id: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "time_sessions"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
     }
     Enums: {
       [_ in never]: never

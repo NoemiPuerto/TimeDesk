@@ -5,6 +5,7 @@ import { MembersPanel } from "../projects/MembersPanel";
 import { ProjectSwitcher } from "../projects/ProjectSwitcher";
 import { useAppStore } from "../../store/useAppStore";
 import { KanbanBoard } from "../board/KanbanBoard";
+import { TimerSection } from "../timer/TimerSection";
 
 const NAV_ITEMS = [
   { key: "timer", label: "Timer" },
@@ -17,7 +18,7 @@ export function AppLayout() {
   const { user, signOut } = useAuth();
   const { data: projects, isLoading } = useMyProjects();
   const { selectedProjectId, selectProject } = useAppStore();
-  const [activeNav, setActiveNav] = useState<(typeof NAV_ITEMS)[number]["key"]>("tasks");
+  const [activeNav, setActiveNav] = useState<(typeof NAV_ITEMS)[number]["key"]>("timer");
 
   useEffect(() => {
     if (!selectedProjectId && projects && projects.length > 0) {
@@ -78,9 +79,14 @@ export function AppLayout() {
             <EmptyProjectsState />
           )}
 
-          {!isLoading && selectedProject && activeNav === "tasks" && <KanbanBoard projectId={selectedProject.id} />}
+          {!isLoading && selectedProject && (activeNav === "timer" || activeNav === "tasks") && (
+            <div className="space-y-8">
+              <TimerSection projectId={selectedProject.id} />
+              <KanbanBoard projectId={selectedProject.id} />
+            </div>
+          )}
 
-          {!isLoading && selectedProject && activeNav !== "tasks" && (
+          {!isLoading && selectedProject && activeNav !== "timer" && activeNav !== "tasks" && (
             <p className="text-on-surface-variant text-sm">Próximamente.</p>
           )}
         </div>
