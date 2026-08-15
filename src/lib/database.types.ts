@@ -223,6 +223,7 @@ export type Database = {
           id: string
           name: string
           owner_id: string
+          team_id: string | null
           updated_at: string
         }
         Insert: {
@@ -231,6 +232,7 @@ export type Database = {
           id?: string
           name: string
           owner_id: string
+          team_id?: string | null
           updated_at?: string
         }
         Update: {
@@ -239,6 +241,7 @@ export type Database = {
           id?: string
           name?: string
           owner_id?: string
+          team_id?: string | null
           updated_at?: string
         }
         Relationships: [
@@ -247,6 +250,13 @@ export type Database = {
             columns: ["owner_id"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "projects_team_id_fkey"
+            columns: ["team_id"]
+            isOneToOne: false
+            referencedRelation: "teams"
             referencedColumns: ["id"]
           },
         ]
@@ -410,6 +420,71 @@ export type Database = {
           },
         ]
       }
+      team_members: {
+        Row: {
+          joined_at: string
+          role: string
+          team_id: string
+          user_id: string
+        }
+        Insert: {
+          joined_at?: string
+          role?: string
+          team_id: string
+          user_id: string
+        }
+        Update: {
+          joined_at?: string
+          role?: string
+          team_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "team_members_team_id_fkey"
+            columns: ["team_id"]
+            isOneToOne: false
+            referencedRelation: "teams"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "team_members_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      teams: {
+        Row: {
+          created_at: string
+          id: string
+          name: string
+          owner_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          name: string
+          owner_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          name?: string
+          owner_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "teams_owner_id_fkey"
+            columns: ["owner_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       time_sessions: {
         Row: {
           ended_at: string | null
@@ -506,23 +581,43 @@ export type Database = {
           isSetofReturn: false
         }
       }
-      create_project: {
-        Args: { p_description?: string; p_name: string }
-        Returns: {
-          created_at: string
-          description: string | null
-          id: string
-          name: string
-          owner_id: string
-          updated_at: string
-        }
-        SetofOptions: {
-          from: "*"
-          to: "projects"
-          isOneToOne: true
-          isSetofReturn: false
-        }
-      }
+      create_project:
+        | {
+            Args: { p_description?: string; p_name: string }
+            Returns: {
+              created_at: string
+              description: string | null
+              id: string
+              name: string
+              owner_id: string
+              team_id: string | null
+              updated_at: string
+            }
+            SetofOptions: {
+              from: "*"
+              to: "projects"
+              isOneToOne: true
+              isSetofReturn: false
+            }
+          }
+        | {
+            Args: { p_description?: string; p_name: string; p_team_id?: string }
+            Returns: {
+              created_at: string
+              description: string | null
+              id: string
+              name: string
+              owner_id: string
+              team_id: string | null
+              updated_at: string
+            }
+            SetofOptions: {
+              from: "*"
+              to: "projects"
+              isOneToOne: true
+              isSetofReturn: false
+            }
+          }
       create_tag: {
         Args: { p_name: string; p_project_id: string }
         Returns: {
@@ -561,6 +656,21 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      create_team: {
+        Args: { p_name: string }
+        Returns: {
+          created_at: string
+          id: string
+          name: string
+          owner_id: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "teams"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       invite_project_member: {
         Args: { p_email: string; p_project_id: string }
         Returns: {
@@ -576,6 +686,21 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      invite_team_member: {
+        Args: { p_email: string; p_team_id: string }
+        Returns: {
+          joined_at: string
+          role: string
+          team_id: string
+          user_id: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "team_members"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       is_project_member: {
         Args: { p_project_id: string; p_user_id: string }
         Returns: boolean
@@ -583,6 +708,26 @@ export type Database = {
       is_project_owner: {
         Args: { p_project_id: string; p_user_id: string }
         Returns: boolean
+      }
+      is_team_admin: {
+        Args: { p_team_id: string; p_user_id: string }
+        Returns: boolean
+      }
+      is_team_member: {
+        Args: { p_team_id: string; p_user_id: string }
+        Returns: boolean
+      }
+      list_team_projects: {
+        Args: { p_team_id: string }
+        Returns: {
+          created_at: string
+          description: string
+          has_access: boolean
+          id: string
+          name: string
+          owner_id: string
+          team_id: string
+        }[]
       }
       start_task_timer: {
         Args: { p_task_id: string }

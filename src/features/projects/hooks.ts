@@ -8,8 +8,12 @@ export function useMyProjects() {
 export function useCreateProject() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ name, description }: { name: string; description: string }) => api.createProject(name, description),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["projects"] }),
+    mutationFn: ({ name, description, teamId }: { name: string; description: string; teamId?: string | null }) =>
+      api.createProject(name, description, teamId),
+    onSuccess: (_data, vars) => {
+      queryClient.invalidateQueries({ queryKey: ["projects"] });
+      if (vars.teamId) queryClient.invalidateQueries({ queryKey: ["team-projects", vars.teamId] });
+    },
   });
 }
 

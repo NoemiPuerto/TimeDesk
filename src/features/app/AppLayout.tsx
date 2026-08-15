@@ -9,6 +9,9 @@ import { TimerSection } from "../timer/TimerSection";
 import { AnalyticsView } from "../analytics/AnalyticsView";
 import { useProjectRealtime } from "../realtime/useProjectRealtime";
 import { useOnlineStatus } from "../../lib/useOnlineStatus";
+import { TeamSwitcher } from "../teams/TeamSwitcher";
+import { TeamMembersPanel } from "../teams/TeamMembersPanel";
+import { useMyTeams, useTeamProjects } from "../teams/hooks";
 
 const NAV_ITEMS = [
   { key: "timer", label: "Timer" },
@@ -19,17 +22,27 @@ const NAV_ITEMS = [
 
 export function AppLayout() {
   const { user, signOut } = useAuth();
-  const { data: projects, isLoading } = useMyProjects();
-  const { selectedProjectId, selectProject } = useAppStore();
+  const { data: personalProjects, isLoading: personalLoading } = useMyProjects();
+  const { selectedProjectId, selectProject, selectedTeamId } = useAppStore();
+  const { data: teams } = useMyTeams();
+  const { data: teamProjects, isLoading: teamProjectsLoading } = useTeamProjects(selectedTeamId);
   const [activeNav, setActiveNav] = useState<(typeof NAV_ITEMS)[number]["key"]>("timer");
 
-  useEffect(() => {
-    if (!selectedProjectId && projects && projects.length > 0) {
-      selectProject(projects[0].id);
-    }
-  }, [projects, selectedProjectId, selectProject]);
+  const isLoading = selectedTeamId ? teamProjectsLoading : personalLoading;
+  const personalOnly = (personalProjects ?? []).filter((p) => !p.team_id);
+  const selectedTeam = teams?.find((t) => t.id === selectedTeamId);
 
-  const selectedProject = projects?.find((p) => p.id === selectedProjectId);
+  useEffect(() => {
+    if (!selectedProjectId && !selectedTeamId && personalOnly.length > 0) {
+      selectProject(personalOnly[0].id);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [personalProjects, selectedProjectId, selectedTeamId, selectProject]);
+
+  const selectedProject = selectedTeamId
+    ? teamProjects?.find((p) => p.id === selectedProjectId && p.has_access)
+    : personalOnly.find((p) => p.id === selectedProjectId);
+
   const { onlineMembers } = useProjectRealtime(selectedProject?.id ?? null);
   const online = useOnlineStatus();
 
@@ -45,6 +58,7 @@ export function AppLayout() {
           <h1 className="text-lg font-bold text-primary">TimeDesk</h1>
         </div>
 
+        <TeamSwitcher />
         <ProjectSwitcher />
 
         <nav className="flex-1 space-y-1 px-4 mt-6">
@@ -78,7 +92,9 @@ export function AppLayout() {
 
       <main className="ml-64 flex-1 flex flex-col min-h-screen">
         <header className="sticky top-0 w-full flex justify-between items-center px-6 h-16 bg-surface-container-low/80 backdrop-blur-sm border-b border-outline-variant/20 z-30">
-          <h2 className="text-sm font-medium text-on-surface truncate">{selectedProject?.name ?? "TimeDesk"}</h2>
+          <h2 className="text-sm font-medium text-on-surface truncate">
+            {selectedProject?.name ?? selectedTeam?.name ?? "TimeDesk"}
+          </h2>
           <div className="flex items-center gap-4">
             {selectedProject && onlineMembers.length > 0 && (
               <span className="flex items-center gap-1.5 text-xs text-on-surface-variant">
@@ -86,15 +102,32 @@ export function AppLayout() {
                 {onlineMembers.length} en línea
               </span>
             )}
-            {selectedProject && <MembersPanel projectId={selectedProject.id} ownerId={selectedProject.owner_id} />}
+            {selectedTeam && <TeamMembersPanel teamId={selectedTeam.id} ownerId={selectedTeam.owner_id} />}
+            {selectedProject && (
+              <MembersPanel
+                projectId={selectedProject.id}
+                ownerId={selectedProject.owner_id}
+                teamId={selectedTeamId}
+              />
+            )}
           </div>
         </header>
 
         <div className="p-8 flex-1 overflow-y-auto">
           {isLoading && <p className="text-on-surface-variant text-sm">Cargando proyectos...</p>}
 
-          {!isLoading && (!projects || projects.length === 0) && (
-            <EmptyProjectsState />
+          {!isLoading && !selectedTeamId && personalOnly.length === 0 && <EmptyProjectsState />}
+
+          {!isLoading && selectedTeamId && (teamProjects ?? []).length === 0 && (
+            <p className="text-on-surface-variant text-sm">
+              Este equipo todavía no tiene proyectos. Usa el selector de arriba a la izquierda para crear uno.
+            </p>
+          )}
+
+          {!isLoading && selectedTeamId && (teamProjects ?? []).length > 0 && !selectedProject && (
+            <p className="text-on-surface-variant text-sm">
+              Elige un proyecto del equipo en el selector de arriba a la izquierda.
+            </p>
           )}
 
           {!isLoading && selectedProject && (activeNav === "timer" || activeNav === "tasks") && (

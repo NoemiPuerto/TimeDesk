@@ -5,6 +5,7 @@ export type Project = {
   name: string;
   description: string | null;
   owner_id: string;
+  team_id: string | null;
   created_at: string;
 };
 
@@ -19,13 +20,13 @@ export type ProjectMember = {
 export async function listMyProjects(): Promise<Project[]> {
   const { data, error } = await supabase
     .from("projects")
-    .select("id, name, description, owner_id, created_at")
+    .select("id, name, description, owner_id, team_id, created_at")
     .order("created_at", { ascending: true });
   if (error) throw error;
   return data;
 }
 
-export async function createProject(name: string, description: string): Promise<Project> {
+export async function createProject(name: string, description: string, teamId?: string | null): Promise<Project> {
   // INSERT goes through an RPC (SECURITY DEFINER) instead of a direct table
   // insert: this Postgres instance rejects INSERTs from non-owner roles on any
   // RLS-enabled table that has a foreign key, so we work around it by running
@@ -33,8 +34,9 @@ export async function createProject(name: string, description: string): Promise<
   const { data, error } = await supabase.rpc("create_project", {
     p_name: name,
     p_description: description || undefined,
+    p_team_id: teamId ?? undefined,
   });
-  if (error) throw error;
+  if (error) throw new Error(error.message);
   return data;
 }
 

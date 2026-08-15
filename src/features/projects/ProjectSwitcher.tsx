@@ -1,23 +1,38 @@
-import { useState, type FormEvent } from "react";
+import { useMemo, useState, type FormEvent } from "react";
 import { useAppStore } from "../../store/useAppStore";
+import { useAuth } from "../auth/AuthProvider";
+import { useTeamMembers, useTeamProjects } from "../teams/hooks";
 import { useCreateProject, useMyProjects } from "./hooks";
 
 export function ProjectSwitcher() {
-  const { data: projects } = useMyProjects();
-  const { selectedProjectId, selectProject } = useAppStore();
+  const { user } = useAuth();
+  const { selectedProjectId, selectProject, selectedTeamId } = useAppStore();
+  const { data: personalProjects } = useMyProjects();
+  const { data: teamProjects } = useTeamProjects(selectedTeamId);
+  const { data: teamMembers } = useTeamMembers(selectedTeamId);
   const createProject = useCreateProject();
   const [open, setOpen] = useState(false);
   const [creating, setCreating] = useState(false);
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
 
-  const selected = projects?.find((p) => p.id === selectedProjectId);
+  const isTeamAdmin = teamMembers?.some((m) => m.user_id === user?.id && m.role === "admin") ?? false;
+  const canCreate = !selectedTeamId || isTeamAdmin;
+
+  const projects = useMemo(() => {
+    if (selectedTeamId) {
+      return (teamProjects ?? []).map((p) => ({ id: p.id, name: p.name, hasAccess: p.has_access }));
+    }
+    return (personalProjects ?? []).filter((p) => !p.team_id).map((p) => ({ id: p.id, name: p.name, hasAccess: true }));
+  }, [selectedTeamId, teamProjects, personalProjects]);
+
+  const selected = projects.find((p) => p.id === selectedProjectId);
 
   async function handleCreate(e: FormEvent) {
     e.preventDefault();
     const trimmed = name.trim();
     if (!trimmed) return;
-    const project = await createProject.mutateAsync({ name: trimmed, description });
+    const project = await createProject.mutateAsync({ name: trimmed, description, teamId: selectedTeamId });
     selectProject(project.id);
     setName("");
     setDescription("");
@@ -30,7 +45,7 @@ export function ProjectSwitcher() {
       <button
         type="button"
         aria-label="Selector de proyecto"
-        className="w-full flex items-center gap-3 mt-6 text-left"
+        className="w-full flex items-center gap-3 mt-2 text-left"
         onClick={() => setOpen((o) => !o)}
       >
         <div className="w-10 h-10 rounded-md bg-primary-container flex items-center justify-center text-on-primary shrink-0">
@@ -40,7 +55,7 @@ export function ProjectSwitcher() {
           <p className="text-sm font-bold text-on-surface truncate">
             {selected ? selected.name : "Elige un proyecto"}
           </p>
-          <p className="text-xs text-on-surface-variant">{projects?.length ?? 0} proyecto(s)</p>
+          <p className="text-xs text-on-surface-variant">{projects.length} proyecto(s)</p>
         </div>
       </button>
 
@@ -49,30 +64,45 @@ export function ProjectSwitcher() {
           {!creating ? (
             <>
               <ul className="flex flex-col gap-1 max-h-48 overflow-y-auto">
-                {projects?.map((project) => (
+                {projects.map((project) => (
                   <li key={project.id}>
                     <button
                       type="button"
-                      className={`w-full text-left px-2 py-1.5 rounded-sm text-sm hover:bg-surface-container-high transition-colors ${
-                        project.id === selectedProjectId ? "text-primary font-medium" : "text-on-surface"
+                      disabled={!project.hasAccess}
+                      title={project.hasAccess ? undefined : "Pídele acceso al administrador del equipo"}
+                      className={`w-full flex items-center gap-1.5 text-left px-2 py-1.5 rounded-sm text-sm transition-colors ${
+                        !project.hasAccess
+                          ? "text-on-surface-variant/50 cursor-not-allowed"
+                          : project.id === selectedProjectId
+                            ? "text-primary font-medium hover:bg-surface-container-high"
+                            : "text-on-surface hover:bg-surface-container-high"
                       }`}
                       onClick={() => {
+                        if (!project.hasAccess) return;
                         selectProject(project.id);
                         setOpen(false);
                       }}
                     >
-                      {project.name}
+                      {!project.hasAccess && <span aria-hidden>🔒</span>}
+                      <span className="truncate">{project.name}</span>
                     </button>
                   </li>
                 ))}
+                {projects.length === 0 && (
+                  <li className="px-2 py-1.5 text-xs text-on-surface-variant">
+                    {selectedTeamId ? "Este equipo todavía no tiene proyectos." : "No tienes proyectos personales."}
+                  </li>
+                )}
               </ul>
-              <button
-                type="button"
-                className="w-full text-left px-2 py-1.5 rounded-sm text-sm text-primary font-medium hover:bg-surface-container-high transition-colors mt-1 border-t border-outline-variant/20 pt-2"
-                onClick={() => setCreating(true)}
-              >
-                + Nuevo proyecto
-              </button>
+              {canCreate && (
+                <button
+                  type="button"
+                  className="w-full text-left px-2 py-1.5 rounded-sm text-sm text-primary font-medium hover:bg-surface-container-high transition-colors mt-1 border-t border-outline-variant/20 pt-2"
+                  onClick={() => setCreating(true)}
+                >
+                  + Nuevo proyecto
+                </button>
+              )}
             </>
           ) : (
             <form onSubmit={handleCreate} className="flex flex-col gap-2 p-1">

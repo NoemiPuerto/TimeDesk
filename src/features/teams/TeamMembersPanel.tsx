@@ -1,30 +1,17 @@
 import { useState, type FormEvent } from "react";
 import { useAuth } from "../auth/AuthProvider";
-import { useTeamMembers } from "../teams/hooks";
-import { useInviteMember, useProjectMembers, useRemoveMember } from "./hooks";
+import { useInviteTeamMember, useRemoveTeamMember, useTeamMembers } from "./hooks";
 
-export function MembersPanel({
-  projectId,
-  ownerId,
-  teamId,
-}: {
-  projectId: string;
-  ownerId: string;
-  teamId?: string | null;
-}) {
+export function TeamMembersPanel({ teamId, ownerId }: { teamId: string; ownerId: string }) {
   const { user } = useAuth();
-  const { data: members } = useProjectMembers(projectId);
-  const { data: teamMembers } = useTeamMembers(teamId ?? null);
-  const inviteMember = useInviteMember(projectId);
-  const removeMember = useRemoveMember(projectId);
+  const { data: members } = useTeamMembers(teamId);
+  const inviteMember = useInviteTeamMember(teamId);
+  const removeMember = useRemoveTeamMember(teamId);
   const [open, setOpen] = useState(false);
   const [email, setEmail] = useState("");
   const [error, setError] = useState<string | null>(null);
 
-  const isOwner = user?.id === ownerId;
-  const isTeamAdmin = teamMembers?.some((m) => m.user_id === user?.id && m.role === "admin") ?? false;
-  const canManage = isOwner || isTeamAdmin;
-  const atCapacity = (members?.length ?? 0) >= 4;
+  const isAdmin = members?.some((m) => m.user_id === user?.id && m.role === "admin") ?? false;
 
   async function handleInvite(e: FormEvent) {
     e.preventDefault();
@@ -43,12 +30,12 @@ export function MembersPanel({
         type="button"
         className="flex items-center -space-x-2"
         onClick={() => setOpen((o) => !o)}
-        aria-label="Miembros del proyecto"
+        aria-label="Miembros del equipo"
       >
         {members?.map((m) => (
           <div
             key={m.user_id}
-            title={m.profile.display_name}
+            title={`${m.profile.display_name}${m.role === "admin" ? " (admin)" : ""}`}
             className="w-8 h-8 rounded-full border-2 border-surface bg-secondary-container text-on-surface flex items-center justify-center text-xs font-bold"
           >
             {m.profile.display_name.slice(0, 1).toUpperCase()}
@@ -65,10 +52,13 @@ export function MembersPanel({
             {members?.map((m) => (
               <li key={m.user_id} className="flex items-center justify-between gap-2 text-sm">
                 <div className="min-w-0">
-                  <p className="text-on-surface truncate">{m.profile.display_name}</p>
+                  <p className="text-on-surface truncate">
+                    {m.profile.display_name}
+                    {m.role === "admin" && <span className="text-on-surface-variant text-xs"> · admin</span>}
+                  </p>
                   <p className="text-on-surface-variant text-xs truncate">{m.profile.email}</p>
                 </div>
-                {canManage && m.user_id !== ownerId && (
+                {isAdmin && m.user_id !== ownerId && (
                   <button
                     type="button"
                     className="text-xs text-error shrink-0"
@@ -81,27 +71,20 @@ export function MembersPanel({
             ))}
           </ul>
 
-          {canManage && (
+          {isAdmin && (
             <form onSubmit={handleInvite} className="flex flex-col gap-2 pt-2 border-t border-outline-variant/20">
               <input
                 type="email"
-                className="bg-surface-container-low border border-outline-variant/30 rounded-sm px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary-container disabled:opacity-50"
-                placeholder={
-                  atCapacity
-                    ? "Proyecto al máximo (4 miembros)"
-                    : teamId
-                      ? "Email de un miembro del equipo"
-                      : "Email de la persona a invitar"
-                }
+                className="bg-surface-container-low border border-outline-variant/30 rounded-sm px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary-container"
+                placeholder="Email de la persona a invitar al equipo"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                disabled={atCapacity}
                 required
               />
               {error && <p className="text-error text-xs">{error}</p>}
               <button
                 type="submit"
-                disabled={atCapacity || inviteMember.isPending}
+                disabled={inviteMember.isPending}
                 className="self-end text-xs bg-primary-container text-on-primary px-3 py-1.5 rounded-full font-medium hover:bg-primary transition-colors disabled:opacity-50"
               >
                 Invitar
