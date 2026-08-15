@@ -112,18 +112,21 @@ export type Database = {
           avatar_url: string | null
           created_at: string
           display_name: string
+          email: string
           id: string
         }
         Insert: {
           avatar_url?: string | null
           created_at?: string
           display_name: string
+          email: string
           id: string
         }
         Update: {
           avatar_url?: string | null
           created_at?: string
           display_name?: string
+          email?: string
           id?: string
         }
         Relationships: []
@@ -321,6 +324,76 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      create_column: {
+        Args: { p_name: string; p_project_id: string }
+        Returns: {
+          board_id: string
+          created_at: string
+          id: string
+          name: string
+          position: number
+          project_id: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "columns"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      create_project: {
+        Args: { p_description?: string; p_name: string }
+        Returns: {
+          created_at: string
+          description: string | null
+          id: string
+          name: string
+          owner_id: string
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "projects"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      create_task: {
+        Args: { p_column_id: string; p_project_id: string; p_title: string }
+        Returns: {
+          assigned_to: string | null
+          column_id: string
+          created_at: string
+          created_by: string
+          description: string | null
+          id: string
+          position: number
+          project_id: string
+          title: string
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "tasks"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      invite_project_member: {
+        Args: { p_email: string; p_project_id: string }
+        Returns: {
+          joined_at: string
+          project_id: string
+          role: string
+          user_id: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "project_members"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       is_project_member: {
         Args: { p_project_id: string; p_user_id: string }
         Returns: boolean
