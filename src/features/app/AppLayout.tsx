@@ -4,7 +4,7 @@ import { useMyProjects } from "../projects/hooks";
 import { MembersPanel } from "../projects/MembersPanel";
 import { ProjectSwitcher } from "../projects/ProjectSwitcher";
 import { useAppStore } from "../../store/useAppStore";
-import { KanbanBoard } from "../board/KanbanBoard";
+import { TaskBoardArea } from "../board/TaskBoardArea";
 import { TimerSection } from "../timer/TimerSection";
 import { AnalyticsView } from "../analytics/AnalyticsView";
 import { useProjectRealtime } from "../realtime/useProjectRealtime";
@@ -100,7 +100,7 @@ export function AppLayout() {
           {!isLoading && selectedProject && (activeNav === "timer" || activeNav === "tasks") && (
             <div className="space-y-8">
               <TimerSection projectId={selectedProject.id} />
-              <KanbanBoard projectId={selectedProject.id} />
+              <TaskBoardArea projectId={selectedProject.id} />
             </div>
           )}
 
