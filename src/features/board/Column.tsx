@@ -1,27 +1,27 @@
 import { useDroppable } from "@dnd-kit/core";
 import { SortableContext, verticalListSortingStrategy } from "@dnd-kit/sortable";
-import { useState, type FormEvent } from "react";
+import { useState } from "react";
 import type { Column as ColumnType, Task } from "./api";
-import { useCreateTask, useDeleteColumn, useRenameColumn } from "./hooks";
+import { useDeleteColumn, useRenameColumn } from "./hooks";
 import { TaskCard } from "./TaskCard";
 
 export function Column({
   column,
   tasks,
   projectId,
+  isDoneColumn,
   onOpenTask,
 }: {
   column: ColumnType;
   tasks: Task[];
   projectId: string;
+  isDoneColumn: boolean;
   onOpenTask: (taskId: string) => void;
 }) {
   const [editingName, setEditingName] = useState(false);
   const [name, setName] = useState(column.name);
-  const [newTaskTitle, setNewTaskTitle] = useState("");
   const renameColumn = useRenameColumn(projectId);
   const deleteColumn = useDeleteColumn(projectId);
-  const createTask = useCreateTask(projectId);
 
   const { setNodeRef, isOver } = useDroppable({ id: column.id, data: { type: "column", columnId: column.id } });
 
@@ -33,14 +33,6 @@ export function Column({
     } else {
       setName(column.name);
     }
-  }
-
-  function handleAddTask(e: FormEvent) {
-    e.preventDefault();
-    const title = newTaskTitle.trim();
-    if (!title) return;
-    createTask.mutate({ columnId: column.id, title });
-    setNewTaskTitle("");
   }
 
   return (
@@ -87,28 +79,16 @@ export function Column({
       >
         <SortableContext items={tasks.map((t) => t.id)} strategy={verticalListSortingStrategy}>
           {tasks.map((task) => (
-            <TaskCard key={task.id} task={task} projectId={projectId} onOpenTask={onOpenTask} />
+            <TaskCard
+              key={task.id}
+              task={task}
+              projectId={projectId}
+              isDone={isDoneColumn}
+              onOpenTask={onOpenTask}
+            />
           ))}
         </SortableContext>
       </div>
-
-      <form onSubmit={handleAddTask} className="flex items-center gap-2 px-1">
-        <input
-          className="flex-1 bg-surface-container-lowest border border-outline-variant/30 rounded-sm px-3 py-1.5 text-xs placeholder-outline/60 focus:outline-none focus:ring-2 focus:ring-primary-container"
-          placeholder="Añadir tarea..."
-          value={newTaskTitle}
-          onChange={(e) => setNewTaskTitle(e.target.value)}
-        />
-        {newTaskTitle.trim() && (
-          <button
-            type="submit"
-            className="text-xs text-primary font-medium px-2 shrink-0"
-            aria-label="Añadir tarea"
-          >
-            Añadir
-          </button>
-        )}
-      </form>
     </div>
   );
 }

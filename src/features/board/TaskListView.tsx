@@ -1,5 +1,6 @@
 import { useMemo } from "react";
 import type { Task } from "./api";
+import { applyTaskFilters, DEFAULT_TASK_FILTERS, type TaskFilters } from "./filters";
 import { useColumns, useCommentCounts, useTaskAssigneesMap, useTaskTagsMap, useTasks } from "./hooks";
 
 const PRIORITY_STYLE: Record<string, { label: string; color: string }> = {
@@ -11,9 +12,11 @@ const PRIORITY_STYLE: Record<string, { label: string; color: string }> = {
 export function TaskListView({
   projectId,
   onOpenTask,
+  filters = DEFAULT_TASK_FILTERS,
 }: {
   projectId: string;
   onOpenTask: (taskId: string) => void;
+  filters?: TaskFilters;
 }) {
   const { data: columns, isLoading: columnsLoading } = useColumns(projectId);
   const { data: tasks, isLoading: tasksLoading } = useTasks(projectId);
@@ -21,16 +24,20 @@ export function TaskListView({
   const { data: assigneesMap } = useTaskAssigneesMap(projectId);
   const { data: commentCounts } = useCommentCounts(projectId);
 
+  const filteredTasks = useMemo(() => applyTaskFilters(tasks ?? [], filters), [tasks, filters]);
+
   const tasksByColumn = useMemo(() => {
     const map = new Map<string, Task[]>();
-    for (const task of tasks ?? []) {
+    for (const task of filteredTasks) {
       const list = map.get(task.column_id) ?? [];
       list.push(task);
       map.set(task.column_id, list);
     }
-    for (const list of map.values()) list.sort((a, b) => a.position - b.position);
+    if (filters.sortBy === "manual") {
+      for (const list of map.values()) list.sort((a, b) => a.position - b.position);
+    }
     return map;
-  }, [tasks]);
+  }, [filteredTasks, filters.sortBy]);
 
   if (columnsLoading || tasksLoading) {
     return <p className="text-on-surface-variant text-sm p-8">Cargando lista...</p>;

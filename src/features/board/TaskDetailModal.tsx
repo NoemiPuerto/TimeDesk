@@ -1,13 +1,17 @@
 import { useState, type FormEvent } from "react";
+import { CheckCircleIcon, TrashIcon } from "../../components/icons";
 import { useAuth } from "../auth/AuthProvider";
 import { useProjectMembers } from "../projects/hooks";
 import type { Priority, Task } from "./api";
+import { DueDatePicker } from "./DueDatePicker";
 import {
   useAddTaskAssignee,
   useAddTaskTag,
   useCreateComment,
+  useCreateSubtask,
   useCreateTag,
   useDeleteComment,
+  useDeleteSubtask,
   useDeleteTask,
   useProjectTags,
   useRemoveTaskAssignee,
@@ -15,7 +19,9 @@ import {
   useRenameTask,
   useTaskAssigneesMap,
   useTaskComments,
+  useTaskSubtasks,
   useTaskTagsMap,
+  useToggleSubtask,
   useUpdateTaskDetails,
 } from "./hooks";
 
@@ -40,6 +46,7 @@ export function TaskDetailModal({
   const [tagPickerOpen, setTagPickerOpen] = useState(false);
   const [assigneePickerOpen, setAssigneePickerOpen] = useState(false);
   const [newComment, setNewComment] = useState("");
+  const [newSubtaskTitle, setNewSubtaskTitle] = useState("");
 
   const { user } = useAuth();
   const renameTask = useRenameTask(projectId);
@@ -48,6 +55,10 @@ export function TaskDetailModal({
   const { data: comments } = useTaskComments(task.id);
   const createComment = useCreateComment(task.id, projectId);
   const deleteComment = useDeleteComment(task.id, projectId);
+  const { data: subtasks } = useTaskSubtasks(task.id);
+  const createSubtask = useCreateSubtask(task.id, projectId);
+  const toggleSubtask = useToggleSubtask(task.id, projectId);
+  const deleteSubtask = useDeleteSubtask(task.id, projectId);
 
   const { data: members } = useProjectMembers(projectId);
   const { data: allTags } = useProjectTags(projectId);
@@ -82,8 +93,8 @@ export function TaskDetailModal({
     updateDetails.mutate({ taskId: task.id, details: { priority: task.priority === priority ? null : priority } });
   }
 
-  function setDueDate(value: string) {
-    updateDetails.mutate({ taskId: task.id, details: { due_date: value || null } });
+  function setDueDate(value: string | null) {
+    updateDetails.mutate({ taskId: task.id, details: { due_date: value } });
   }
 
   async function handleCreateTag(e: FormEvent) {
@@ -108,6 +119,14 @@ export function TaskDetailModal({
     if (!body) return;
     createComment.mutate(body);
     setNewComment("");
+  }
+
+  function handleAddSubtask(e: FormEvent) {
+    e.preventDefault();
+    const title = newSubtaskTitle.trim();
+    if (!title) return;
+    createSubtask.mutate(title);
+    setNewSubtaskTitle("");
   }
 
   return (
@@ -172,12 +191,7 @@ export function TaskDetailModal({
             <label className="text-xs font-bold uppercase tracking-widest text-on-surface-variant">
               Fecha límite
             </label>
-            <input
-              type="date"
-              defaultValue={task.due_date ?? ""}
-              onChange={(e) => setDueDate(e.target.value)}
-              className="bg-surface-container-lowest border border-outline-variant/30 rounded-md px-3 py-1.5 text-sm text-on-surface focus:outline-none focus:ring-2 focus:ring-primary-container"
-            />
+            <DueDatePicker value={task.due_date} onChange={setDueDate} />
           </div>
         </div>
 
@@ -213,7 +227,7 @@ export function TaskDetailModal({
                 +
               </button>
               {tagPickerOpen && (
-                <div className="absolute left-0 mt-2 w-56 bg-surface-container-lowest border border-outline-variant/30 rounded-md shadow-lg z-10 p-2 flex flex-col gap-2">
+                <div className="absolute left-0 mt-2 w-72 bg-surface-container-lowest border border-outline-variant/30 rounded-md shadow-lg z-10 p-2 flex flex-col gap-2">
                   {availableTags.length > 0 && (
                     <ul className="flex flex-col gap-1 max-h-32 overflow-y-auto">
                       {availableTags.map((tag) => (
@@ -233,15 +247,15 @@ export function TaskDetailModal({
                       ))}
                     </ul>
                   )}
-                  <form onSubmit={handleCreateTag} className="flex gap-1 border-t border-outline-variant/20 pt-2">
+                  <form onSubmit={handleCreateTag} className="flex items-center gap-2 border-t border-outline-variant/20 pt-2">
                     <input
                       autoFocus
-                      className="flex-1 bg-surface-container-low border border-outline-variant/30 rounded-sm px-2 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-primary-container"
+                      className="flex-1 min-w-0 bg-surface-container-low border border-outline-variant/30 rounded-sm px-2 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-primary-container"
                       placeholder="Nueva categoría"
                       value={newTagName}
                       onChange={(e) => setNewTagName(e.target.value)}
                     />
-                    <button type="submit" className="text-xs text-primary font-medium px-1 shrink-0">
+                    <button type="submit" className="text-xs text-primary font-medium px-1.5 shrink-0">
                       Crear
                     </button>
                   </form>
@@ -312,6 +326,61 @@ export function TaskDetailModal({
               )}
             </div>
           </div>
+        </div>
+
+        {/* Subtasks */}
+        <div className="flex flex-col gap-3 border-t border-outline-variant/20 pt-4">
+          <span className="text-xs font-bold uppercase tracking-widest text-on-surface-variant">
+            Subtareas {subtasks && subtasks.length > 0 ? `(${subtasks.filter((s) => s.is_done).length}/${subtasks.length})` : ""}
+          </span>
+
+          {subtasks && subtasks.length > 0 && (
+            <ul className="flex flex-col gap-1">
+              {subtasks.map((s) => (
+                <li key={s.id} className="flex items-center gap-2 group/subtask">
+                  <button
+                    type="button"
+                    onClick={() => toggleSubtask.mutate({ subtaskId: s.id, isDone: !s.is_done })}
+                    aria-label={s.is_done ? "Marcar como pendiente" : "Marcar como completada"}
+                    className={`shrink-0 w-4 h-4 rounded-full border flex items-center justify-center transition-colors ${
+                      s.is_done
+                        ? "bg-primary-container border-primary-container text-on-primary"
+                        : "border-outline-variant/50 text-transparent hover:border-primary"
+                    }`}
+                  >
+                    <CheckCircleIcon className="w-3 h-3" />
+                  </button>
+                  <span
+                    className={`flex-1 min-w-0 text-sm truncate ${
+                      s.is_done ? "text-on-surface-variant line-through decoration-outline" : "text-on-surface"
+                    }`}
+                  >
+                    {s.title}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => deleteSubtask.mutate(s.id)}
+                    aria-label={`Eliminar subtarea ${s.title}`}
+                    className="text-outline opacity-0 group-hover/subtask:opacity-100 hover:text-error transition-opacity shrink-0"
+                  >
+                    <TrashIcon className="w-3.5 h-3.5" />
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+
+          <form onSubmit={handleAddSubtask} className="flex items-center gap-2">
+            <input
+              className="flex-1 min-w-0 bg-surface-container-lowest border border-outline-variant/30 rounded-sm px-2 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-primary-container"
+              placeholder="Añadir subtarea..."
+              value={newSubtaskTitle}
+              onChange={(e) => setNewSubtaskTitle(e.target.value)}
+            />
+            <button type="submit" disabled={!newSubtaskTitle.trim()} className="text-xs text-primary font-medium px-1.5 shrink-0 disabled:opacity-40">
+              Añadir
+            </button>
+          </form>
         </div>
 
         {/* Comments */}

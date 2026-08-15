@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { BarChartIcon, ClockIcon, KanbanIcon, LogOutIcon, SettingsIcon } from "../../components/icons";
 import { useAuth } from "../auth/AuthProvider";
 import { useMyProjects } from "../projects/hooks";
 import { MembersPanel } from "../projects/MembersPanel";
@@ -14,10 +15,10 @@ import { TeamMembersPanel } from "../teams/TeamMembersPanel";
 import { useMyTeams, useTeamProjects } from "../teams/hooks";
 
 const NAV_ITEMS = [
-  { key: "timer", label: "Timer" },
-  { key: "tasks", label: "Tasks" },
-  { key: "analytics", label: "Analytics" },
-  { key: "settings", label: "Settings" },
+  { key: "timer", label: "Timer", icon: ClockIcon },
+  { key: "tasks", label: "Tasks", icon: KanbanIcon },
+  { key: "analytics", label: "Analytics", icon: BarChartIcon },
+  { key: "settings", label: "Settings", icon: SettingsIcon },
 ] as const;
 
 export function AppLayout() {
@@ -73,6 +74,7 @@ export function AppLayout() {
               }`}
               onClick={() => setActiveNav(item.key)}
             >
+              <item.icon className="w-4 h-4 shrink-0" />
               {item.label}
             </button>
           ))}
@@ -82,9 +84,10 @@ export function AppLayout() {
           <p className="text-xs text-on-surface-variant truncate mb-2">{user?.email}</p>
           <button
             type="button"
-            className="text-xs text-on-surface-variant hover:text-on-surface underline"
+            className="flex items-center gap-1.5 text-xs text-on-surface-variant hover:text-on-surface transition-colors"
             onClick={signOut}
           >
+            <LogOutIcon className="w-3.5 h-3.5" />
             Cerrar sesión
           </button>
         </div>
@@ -130,11 +133,15 @@ export function AppLayout() {
             </p>
           )}
 
-          {!isLoading && selectedProject && (activeNav === "timer" || activeNav === "tasks") && (
+          {!isLoading && selectedProject && activeNav === "timer" && (
             <div className="space-y-8">
-              <TimerSection projectId={selectedProject.id} />
-              <TaskBoardArea projectId={selectedProject.id} />
+              <TimerSection projectId={selectedProject.id} projectName={selectedProject.name} />
+              <TaskBoardArea projectId={selectedProject.id} boardOnly />
             </div>
+          )}
+
+          {!isLoading && selectedProject && activeNav === "tasks" && (
+            <TaskBoardArea projectId={selectedProject.id} />
           )}
 
           {!isLoading && selectedProject && activeNav === "analytics" && (

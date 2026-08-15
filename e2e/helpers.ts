@@ -21,3 +21,8 @@ export async function createProject(page: Page, name: string) {
   await page.getByPlaceholder("Nombre del proyecto").fill(name);
   await page.getByRole("button", { name: "Crear", exact: true }).click();
 }
+
+export async function addTask(page: Page, title: string) {
+  await page.getByPlaceholder(/Añadir tarea a/).fill(title);
+  await page.getByRole("button", { name: "Crear", exact: true }).click();
+}

@@ -12,31 +12,6 @@ export type Database = {
   __InternalSupabase: {
     PostgrestVersion: "14.15"
   }
-  graphql_public: {
-    Tables: {
-      [_ in never]: never
-    }
-    Views: {
-      [_ in never]: never
-    }
-    Functions: {
-      graphql: {
-        Args: {
-          extensions?: Json
-          operationName?: string
-          query?: string
-          variables?: Json
-        }
-        Returns: Json
-      }
-    }
-    Enums: {
-      [_ in never]: never
-    }
-    CompositeTypes: {
-      [_ in never]: never
-    }
-  }
   public: {
     Tables: {
       boards: {
@@ -257,6 +232,51 @@ export type Database = {
             columns: ["team_id"]
             isOneToOne: false
             referencedRelation: "teams"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      subtasks: {
+        Row: {
+          created_at: string
+          id: string
+          is_done: boolean
+          position: number
+          project_id: string
+          task_id: string
+          title: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          is_done?: boolean
+          position?: number
+          project_id: string
+          task_id: string
+          title: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          is_done?: boolean
+          position?: number
+          project_id?: string
+          task_id?: string
+          title?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "subtasks_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "subtasks_task_id_fkey"
+            columns: ["task_id"]
+            isOneToOne: false
+            referencedRelation: "tasks"
             referencedColumns: ["id"]
           },
         ]
@@ -581,43 +601,42 @@ export type Database = {
           isSetofReturn: false
         }
       }
-      create_project:
-        | {
-            Args: { p_description?: string; p_name: string }
-            Returns: {
-              created_at: string
-              description: string | null
-              id: string
-              name: string
-              owner_id: string
-              team_id: string | null
-              updated_at: string
-            }
-            SetofOptions: {
-              from: "*"
-              to: "projects"
-              isOneToOne: true
-              isSetofReturn: false
-            }
-          }
-        | {
-            Args: { p_description?: string; p_name: string; p_team_id?: string }
-            Returns: {
-              created_at: string
-              description: string | null
-              id: string
-              name: string
-              owner_id: string
-              team_id: string | null
-              updated_at: string
-            }
-            SetofOptions: {
-              from: "*"
-              to: "projects"
-              isOneToOne: true
-              isSetofReturn: false
-            }
-          }
+      create_project: {
+        Args: { p_description?: string; p_name: string; p_team_id?: string }
+        Returns: {
+          created_at: string
+          description: string | null
+          id: string
+          name: string
+          owner_id: string
+          team_id: string | null
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "projects"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      create_subtask: {
+        Args: { p_task_id: string; p_title: string }
+        Returns: {
+          created_at: string
+          id: string
+          is_done: boolean
+          position: number
+          project_id: string
+          task_id: string
+          title: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "subtasks"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       create_tag: {
         Args: { p_name: string; p_project_id: string }
         Returns: {
@@ -874,9 +893,6 @@ export type CompositeTypes<
     : never
 
 export const Constants = {
-  graphql_public: {
-    Enums: {},
-  },
   public: {
     Enums: {},
   },

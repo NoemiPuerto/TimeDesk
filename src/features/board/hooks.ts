@@ -3,6 +3,7 @@ import * as api from "./api";
 import * as tagsApi from "./tags";
 import * as assigneesApi from "./assignees";
 import * as commentsApi from "./comments";
+import * as subtasksApi from "./subtasks";
 
 export function useColumns(projectId: string | null) {
   return useQuery({
@@ -221,5 +222,57 @@ export function useDeleteComment(taskId: string | null, projectId: string | null
       queryClient.invalidateQueries({ queryKey: ["comments", taskId] });
       queryClient.invalidateQueries({ queryKey: ["comment-counts", projectId] });
     },
+  });
+}
+
+// ── Subtasks ─────────────────────────────────────────────────────────────
+
+export function useTaskSubtasks(taskId: string | null) {
+  return useQuery({
+    queryKey: ["subtasks", taskId],
+    queryFn: () => subtasksApi.listTaskSubtasks(taskId as string),
+    enabled: !!taskId,
+  });
+}
+
+export function useSubtaskCounts(projectId: string | null) {
+  return useQuery({
+    queryKey: ["subtask-counts", projectId],
+    queryFn: () => subtasksApi.listSubtaskCounts(projectId as string),
+    enabled: !!projectId,
+  });
+}
+
+function invalidateSubtaskQueries(
+  queryClient: ReturnType<typeof useQueryClient>,
+  taskId: string | null,
+  projectId: string | null,
+) {
+  queryClient.invalidateQueries({ queryKey: ["subtasks", taskId] });
+  queryClient.invalidateQueries({ queryKey: ["subtask-counts", projectId] });
+}
+
+export function useCreateSubtask(taskId: string | null, projectId: string | null) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (title: string) => subtasksApi.createSubtask(taskId as string, title),
+    onSuccess: () => invalidateSubtaskQueries(queryClient, taskId, projectId),
+  });
+}
+
+export function useToggleSubtask(taskId: string | null, projectId: string | null) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ subtaskId, isDone }: { subtaskId: string; isDone: boolean }) =>
+      subtasksApi.toggleSubtask(subtaskId, isDone),
+    onSuccess: () => invalidateSubtaskQueries(queryClient, taskId, projectId),
+  });
+}
+
+export function useDeleteSubtask(taskId: string | null, projectId: string | null) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (subtaskId: string) => subtasksApi.deleteSubtask(subtaskId),
+    onSuccess: () => invalidateSubtaskQueries(queryClient, taskId, projectId),
   });
 }

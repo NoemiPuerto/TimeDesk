@@ -2,15 +2,19 @@ import { DndContext, closestCorners, PointerSensor, useSensor, useSensors, type 
 import { arrayMove } from "@dnd-kit/sortable";
 import { useMemo, useState, type FormEvent } from "react";
 import type { Task } from "./api";
+import { applyTaskFilters, DEFAULT_TASK_FILTERS, type TaskFilters } from "./filters";
 import { useColumns, useCreateColumn, useReorderTasks, useTasks } from "./hooks";
 import { Column } from "./Column";
+import { QuickAddTask } from "./QuickAddTask";
 
 export function KanbanBoard({
   projectId,
   onOpenTask,
+  filters = DEFAULT_TASK_FILTERS,
 }: {
   projectId: string;
   onOpenTask: (taskId: string) => void;
+  filters?: TaskFilters;
 }) {
   const { data: columns, isLoading: columnsLoading } = useColumns(projectId);
   const { data: tasks, isLoading: tasksLoading } = useTasks(projectId);
@@ -20,16 +24,20 @@ export function KanbanBoard({
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 4 } }));
 
+  const filteredTasks = useMemo(() => applyTaskFilters(tasks ?? [], filters), [tasks, filters]);
+
   const tasksByColumn = useMemo(() => {
     const map = new Map<string, Task[]>();
-    for (const task of tasks ?? []) {
+    for (const task of filteredTasks) {
       const list = map.get(task.column_id) ?? [];
       list.push(task);
       map.set(task.column_id, list);
     }
-    for (const list of map.values()) list.sort((a, b) => a.position - b.position);
+    if (filters.sortBy === "manual") {
+      for (const list of map.values()) list.sort((a, b) => a.position - b.position);
+    }
     return map;
-  }, [tasks]);
+  }, [filteredTasks, filters.sortBy]);
 
   function handleDragEnd(event: DragEndEvent) {
     const { active, over } = event;
@@ -88,48 +96,55 @@ export function KanbanBoard({
     return <p className="text-on-surface-variant text-sm p-8">Cargando tablero...</p>;
   }
 
-  return (
-    <DndContext sensors={sensors} collisionDetection={closestCorners} onDragEnd={handleDragEnd}>
-      <div className="flex items-start gap-6 overflow-x-auto pb-4">
-        {(columns ?? []).map((column) => (
-          <Column
-            key={column.id}
-            column={column}
-            tasks={tasksByColumn.get(column.id) ?? []}
-            projectId={projectId}
-            onOpenTask={onOpenTask}
-          />
-        ))}
+  const lastColumnId = columns && columns.length > 0 ? columns[columns.length - 1].id : null;
 
-        {addingColumn ? (
-          <form onSubmit={handleAddColumn} className="w-64 shrink-0 flex gap-2">
-            <input
-              autoFocus
-              className="flex-1 bg-surface-container-low border border-outline-variant/30 rounded-md px-3 py-2 text-sm placeholder-outline/60 focus:outline-none focus:ring-2 focus:ring-primary-container"
-              placeholder="Nombre de la columna"
-              value={newColumnName}
-              onChange={(e) => setNewColumnName(e.target.value)}
-              onBlur={() => !newColumnName.trim() && setAddingColumn(false)}
-              onKeyDown={(e) => e.key === "Escape" && setAddingColumn(false)}
+  return (
+    <div className="flex flex-col gap-4">
+      <QuickAddTask projectId={projectId} columns={columns ?? []} />
+
+      <DndContext sensors={sensors} collisionDetection={closestCorners} onDragEnd={handleDragEnd}>
+        <div className="flex items-start gap-6 overflow-x-auto pb-4">
+          {(columns ?? []).map((column) => (
+            <Column
+              key={column.id}
+              column={column}
+              tasks={tasksByColumn.get(column.id) ?? []}
+              projectId={projectId}
+              isDoneColumn={column.id === lastColumnId}
+              onOpenTask={onOpenTask}
             />
-            {newColumnName.trim() && (
-              <button type="submit" className="text-sm text-primary font-medium px-2 shrink-0">
-                Añadir
-              </button>
-            )}
-          </form>
-        ) : (
-          <button
-            type="button"
-            title="Añadir columna"
-            aria-label="Añadir columna"
-            onClick={() => setAddingColumn(true)}
-            className="shrink-0 w-9 h-9 flex items-center justify-center rounded-md border border-outline-variant/30 text-on-surface-variant hover:text-primary hover:border-primary transition-colors"
-          >
-            +
-          </button>
-        )}
-      </div>
-    </DndContext>
+          ))}
+
+          {addingColumn ? (
+            <form onSubmit={handleAddColumn} className="w-64 shrink-0 flex gap-2">
+              <input
+                autoFocus
+                className="flex-1 bg-surface-container-low border border-outline-variant/30 rounded-md px-3 py-2 text-sm placeholder-outline/60 focus:outline-none focus:ring-2 focus:ring-primary-container"
+                placeholder="Nombre de la columna"
+                value={newColumnName}
+                onChange={(e) => setNewColumnName(e.target.value)}
+                onBlur={() => !newColumnName.trim() && setAddingColumn(false)}
+                onKeyDown={(e) => e.key === "Escape" && setAddingColumn(false)}
+              />
+              {newColumnName.trim() && (
+                <button type="submit" className="text-sm text-primary font-medium px-2 shrink-0">
+                  Añadir
+                </button>
+              )}
+            </form>
+          ) : (
+            <button
+              type="button"
+              title="Añadir columna"
+              aria-label="Añadir columna"
+              onClick={() => setAddingColumn(true)}
+              className="shrink-0 w-9 h-9 flex items-center justify-center rounded-md border border-outline-variant/30 text-on-surface-variant hover:text-primary hover:border-primary transition-colors"
+            >
+              +
+            </button>
+          )}
+        </div>
+      </DndContext>
+    </div>
   );
 }

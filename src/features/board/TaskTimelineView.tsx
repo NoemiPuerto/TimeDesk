@@ -1,5 +1,6 @@
 import { useMemo } from "react";
 import type { Task } from "./api";
+import { applyTaskFilters, DEFAULT_TASK_FILTERS, type TaskFilters } from "./filters";
 import { useTasks } from "./hooks";
 
 const PRIORITY_COLOR: Record<string, string> = { high: "#eb3619", medium: "#f59e0b", low: "#a3a3a3" };
@@ -12,11 +13,14 @@ function dateKey(d: Date): string {
 export function TaskTimelineView({
   projectId,
   onOpenTask,
+  filters = DEFAULT_TASK_FILTERS,
 }: {
   projectId: string;
   onOpenTask: (taskId: string) => void;
+  filters?: TaskFilters;
 }) {
-  const { data: tasks, isLoading } = useTasks(projectId);
+  const { data: rawTasks, isLoading } = useTasks(projectId);
+  const tasks = useMemo(() => applyTaskFilters(rawTasks ?? [], filters), [rawTasks, filters]);
 
   const days = useMemo(() => {
     const today = new Date();
