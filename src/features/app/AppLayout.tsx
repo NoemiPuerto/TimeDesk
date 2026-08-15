@@ -7,6 +7,7 @@ import { useAppStore } from "../../store/useAppStore";
 import { KanbanBoard } from "../board/KanbanBoard";
 import { TimerSection } from "../timer/TimerSection";
 import { AnalyticsView } from "../analytics/AnalyticsView";
+import { useProjectRealtime } from "../realtime/useProjectRealtime";
 
 const NAV_ITEMS = [
   { key: "timer", label: "Timer" },
@@ -28,6 +29,7 @@ export function AppLayout() {
   }, [projects, selectedProjectId, selectProject]);
 
   const selectedProject = projects?.find((p) => p.id === selectedProjectId);
+  const { onlineMembers } = useProjectRealtime(selectedProject?.id ?? null);
 
   return (
     <div className="min-h-screen bg-background text-on-background flex">
@@ -70,7 +72,15 @@ export function AppLayout() {
       <main className="ml-64 flex-1 flex flex-col min-h-screen">
         <header className="sticky top-0 w-full flex justify-between items-center px-6 h-16 bg-surface-container-low/80 backdrop-blur-sm border-b border-outline-variant/20 z-30">
           <h2 className="text-sm font-medium text-on-surface truncate">{selectedProject?.name ?? "TimeDesk"}</h2>
-          {selectedProject && <MembersPanel projectId={selectedProject.id} ownerId={selectedProject.owner_id} />}
+          <div className="flex items-center gap-4">
+            {selectedProject && onlineMembers.length > 0 && (
+              <span className="flex items-center gap-1.5 text-xs text-on-surface-variant">
+                <span className="w-1.5 h-1.5 rounded-full bg-primary" />
+                {onlineMembers.length} en línea
+              </span>
+            )}
+            {selectedProject && <MembersPanel projectId={selectedProject.id} ownerId={selectedProject.owner_id} />}
+          </div>
         </header>
 
         <div className="p-8 flex-1 overflow-y-auto">
