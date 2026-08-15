@@ -6,6 +6,7 @@ import { ProjectSwitcher } from "../projects/ProjectSwitcher";
 import { useAppStore } from "../../store/useAppStore";
 import { KanbanBoard } from "../board/KanbanBoard";
 import { TimerSection } from "../timer/TimerSection";
+import { AnalyticsView } from "../analytics/AnalyticsView";
 
 const NAV_ITEMS = [
   { key: "timer", label: "Timer" },
@@ -86,7 +87,11 @@ export function AppLayout() {
             </div>
           )}
 
-          {!isLoading && selectedProject && activeNav !== "timer" && activeNav !== "tasks" && (
+          {!isLoading && selectedProject && activeNav === "analytics" && (
+            <AnalyticsView projectId={selectedProject.id} />
+          )}
+
+          {!isLoading && selectedProject && activeNav === "settings" && (
             <p className="text-on-surface-variant text-sm">Próximamente.</p>
           )}
         </div>
