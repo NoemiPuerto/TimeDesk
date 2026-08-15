@@ -29,6 +29,24 @@ npm run tauri dev
    npx supabase gen types typescript --linked > src/lib/database.types.ts
    ```
 
+## Tests end-to-end
+
+Smoke tests con Playwright, contra tu proyecto real de Supabase (cada test crea una cuenta de prueba desechable — sin cleanup automático de usuarios, ver nota en `CLAUDE.md`):
+
+```bash
+npx playwright install chromium   # solo la primera vez
+npm run dev                        # en otra terminal, o dejá que Playwright lo levante solo
+npm run test:e2e
+```
+
+## Empaquetar el instalador de Windows
+
+```bash
+npm run tauri build
+```
+
+El instalador (`.exe`/`.msi`) queda en `src-tauri/target/release/bundle/`.
+
 ## Recommended IDE Setup
 
 - [VS Code](https://code.visualstudio.com/) + [Tauri](https://marketplace.visualstudio.com/items?itemName=tauri-apps.tauri-vscode) + [rust-analyzer](https://marketplace.visualstudio.com/items?itemName=rust-lang.rust-analyzer)

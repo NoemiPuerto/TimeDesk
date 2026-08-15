@@ -25,6 +25,8 @@ export function useInviteMember(projectId: string | null) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (email: string) => api.inviteMemberByEmail(projectId as string, email),
+    // MembersPanel already shows this error inline next to the invite field.
+    meta: { suppressToast: true },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["project-members", projectId] }),
   });
 }

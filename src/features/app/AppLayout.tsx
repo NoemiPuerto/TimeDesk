@@ -8,6 +8,7 @@ import { KanbanBoard } from "../board/KanbanBoard";
 import { TimerSection } from "../timer/TimerSection";
 import { AnalyticsView } from "../analytics/AnalyticsView";
 import { useProjectRealtime } from "../realtime/useProjectRealtime";
+import { useOnlineStatus } from "../../lib/useOnlineStatus";
 
 const NAV_ITEMS = [
   { key: "timer", label: "Timer" },
@@ -30,9 +31,15 @@ export function AppLayout() {
 
   const selectedProject = projects?.find((p) => p.id === selectedProjectId);
   const { onlineMembers } = useProjectRealtime(selectedProject?.id ?? null);
+  const online = useOnlineStatus();
 
   return (
     <div className="min-h-screen bg-background text-on-background flex">
+      {!online && (
+        <div className="fixed top-0 left-0 right-0 z-50 bg-error text-white text-xs text-center py-1.5">
+          Sin conexión — los cambios se guardarán cuando vuelvas a estar en línea.
+        </div>
+      )}
       <aside className="h-screen w-64 fixed left-0 top-0 border-r border-outline-variant/20 bg-surface-container-low flex flex-col py-6 gap-2 z-40">
         <div className="px-4">
           <h1 className="text-lg font-bold text-primary">TimeDesk</h1>
@@ -111,15 +118,34 @@ export function AppLayout() {
 }
 
 function EmptyProjectsState() {
+  const steps = [
+    { label: "Crea tu primer proyecto", detail: "Usa el selector de arriba a la izquierda." },
+    { label: "Añade tareas al tablero", detail: "Cada proyecto trae columnas To Do / In Progress / Done." },
+    { label: "Inicia el timer", detail: "Toca el ícono ▶ de una tarea para empezar a cronometrar." },
+  ];
+
   return (
-    <div className="flex flex-col items-center justify-center gap-3 text-center max-w-sm mx-auto mt-24">
+    <div className="flex flex-col items-center justify-center gap-6 text-center max-w-sm mx-auto mt-24">
       <div className="w-12 h-12 rounded-md bg-primary-container flex items-center justify-center text-on-primary font-bold">
         TD
       </div>
-      <h3 className="text-lg font-bold text-on-surface">Crea tu primer proyecto</h3>
-      <p className="text-on-surface-variant text-sm">
-        Usa el selector de arriba a la izquierda para crear un proyecto y empezar a organizar tus tareas.
-      </p>
+      <div>
+        <h3 className="text-lg font-bold text-on-surface">Bienvenido a TimeDesk</h3>
+        <p className="text-on-surface-variant text-sm mt-1">Tres pasos para empezar:</p>
+      </div>
+      <ol className="w-full flex flex-col gap-3 text-left">
+        {steps.map((step, i) => (
+          <li key={step.label} className="flex items-start gap-3">
+            <span className="shrink-0 w-6 h-6 rounded-full bg-surface-container-high text-on-surface-variant text-xs font-bold flex items-center justify-center">
+              {i + 1}
+            </span>
+            <div>
+              <p className="text-sm font-medium text-on-surface">{step.label}</p>
+              <p className="text-xs text-on-surface-variant">{step.detail}</p>
+            </div>
+          </li>
+        ))}
+      </ol>
     </div>
   );
 }

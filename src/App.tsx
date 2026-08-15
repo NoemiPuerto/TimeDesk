@@ -3,6 +3,8 @@ import { queryClient } from "./lib/queryClient";
 import { AuthProvider, useAuth } from "./features/auth/AuthProvider";
 import { AuthScreen } from "./features/auth/AuthScreen";
 import { AppLayout } from "./features/app/AppLayout";
+import { ErrorBoundary } from "./components/ErrorBoundary";
+import { ToastContainer } from "./components/ToastContainer";
 
 function AppShell() {
   const { session, loading } = useAuth();
@@ -24,11 +26,14 @@ function AppShell() {
 
 function App() {
   return (
-    <QueryClientProvider client={queryClient}>
-      <AuthProvider>
-        <AppShell />
-      </AuthProvider>
-    </QueryClientProvider>
+    <ErrorBoundary>
+      <QueryClientProvider client={queryClient}>
+        <AuthProvider>
+          <AppShell />
+          <ToastContainer />
+        </AuthProvider>
+      </QueryClientProvider>
+    </ErrorBoundary>
   );
 }
 

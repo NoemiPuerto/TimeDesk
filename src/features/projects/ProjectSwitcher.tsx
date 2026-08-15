@@ -29,6 +29,7 @@ export function ProjectSwitcher() {
     <div className="relative px-2">
       <button
         type="button"
+        aria-label="Selector de proyecto"
         className="w-full flex items-center gap-3 mt-6 text-left"
         onClick={() => setOpen((o) => !o)}
       >
