@@ -1,5 +1,6 @@
 import { useEffect } from "react";
 import { AvatarUpload } from "../../components/Avatar";
+import { UpdateBanner } from "../../components/UpdateBanner";
 import { BarChartIcon, ClockIcon, GridIcon, KanbanIcon, LogOutIcon, SettingsIcon } from "../../components/icons";
 import { useAuth } from "../auth/AuthProvider";
 import { DashboardView } from "../dashboard/DashboardView";
@@ -68,6 +69,7 @@ export function AppLayout() {
           Sin conexión — los cambios se guardarán cuando vuelvas a estar en línea.
         </div>
       )}
+      {online && <UpdateBanner />}
       <aside className="h-screen w-64 fixed left-0 top-0 border-r border-outline-variant/20 bg-surface-container-low flex flex-col py-6 gap-2 z-40">
         <div className="px-4 flex items-center gap-2">
           <img src="/favicon.svg" alt="" className="w-6 h-6 shrink-0" />

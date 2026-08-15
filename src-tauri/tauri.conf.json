@@ -26,6 +26,7 @@
   "bundle": {
     "active": true,
     "targets": "all",
+    "createUpdaterArtifacts": true,
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",
@@ -33,5 +34,13 @@
       "icons/icon.icns",
       "icons/icon.ico"
     ]
+  },
+  "plugins": {
+    "updater": {
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDQ4NjA5ODQ5QThBMzMxNDAKUldSQU1hT29TWmhnU0NaRm4rMTNyd1RQREtiNEFnU3NveG13YWowYmpEbUhkRUllVEFzZVBWMmkK",
+      "endpoints": [
+        "https://github.com/NoemiPuerto/TimeDesk/releases/latest/download/latest.json"
+      ]
+    }
   }
 }
