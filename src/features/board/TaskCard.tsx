@@ -3,7 +3,7 @@ import { CSS } from "@dnd-kit/utilities";
 import { useAppStore } from "../../store/useAppStore";
 import { useActiveSession, useStartTimer, useStopTimer } from "../timer/hooks";
 import type { Task } from "./api";
-import { useDeleteTask, useTaskAssigneesMap, useTaskTagsMap } from "./hooks";
+import { useCommentCounts, useDeleteTask, useTaskAssigneesMap, useTaskTagsMap } from "./hooks";
 
 const PRIORITY_STYLE: Record<string, { label: string; color: string }> = {
   high: { label: "Alta", color: "#eb3619" },
@@ -27,10 +27,12 @@ export function TaskCard({
   const stopTimer = useStopTimer();
   const { data: tagsMap } = useTaskTagsMap(projectId);
   const { data: assigneesMap } = useTaskAssigneesMap(projectId);
+  const { data: commentCounts } = useCommentCounts(projectId);
 
   const isActive = activeSession?.task_id === task.id;
   const tags = tagsMap?.get(task.id) ?? [];
   const assignees = assigneesMap?.get(task.id) ?? [];
+  const commentCount = commentCounts?.get(task.id) ?? 0;
   const priority = task.priority ? PRIORITY_STYLE[task.priority] : null;
 
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
@@ -121,9 +123,12 @@ export function TaskCard({
         </button>
       </div>
 
-      {(dueDateLabel || assignees.length > 0) && (
+      {(dueDateLabel || commentCount > 0 || assignees.length > 0) && (
         <div className="flex items-center justify-between mt-3 pt-2 border-t border-outline-variant/10">
-          <span className="text-[11px] text-on-surface-variant">{dueDateLabel ?? ""}</span>
+          <span className="flex items-center gap-2 text-[11px] text-on-surface-variant">
+            {dueDateLabel}
+            {commentCount > 0 && <span>💬 {commentCount}</span>}
+          </span>
           {assignees.length > 0 && (
             <div className="flex -space-x-1.5">
               {assignees.slice(0, 3).map((a) => (

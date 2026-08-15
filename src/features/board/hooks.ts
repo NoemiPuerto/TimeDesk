@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import * as api from "./api";
 import * as tagsApi from "./tags";
 import * as assigneesApi from "./assignees";
+import * as commentsApi from "./comments";
 
 export function useColumns(projectId: string | null) {
   return useQuery({
@@ -180,5 +181,45 @@ export function useRemoveTaskAssignee(projectId: string | null) {
     mutationFn: ({ taskId, userId }: { taskId: string; userId: string }) =>
       assigneesApi.removeTaskAssignee(taskId, userId),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["task-assignees", projectId] }),
+  });
+}
+
+// ── Comments ─────────────────────────────────────────────────────────────
+
+export function useTaskComments(taskId: string | null) {
+  return useQuery({
+    queryKey: ["comments", taskId],
+    queryFn: () => commentsApi.listTaskComments(taskId as string),
+    enabled: !!taskId,
+  });
+}
+
+export function useCommentCounts(projectId: string | null) {
+  return useQuery({
+    queryKey: ["comment-counts", projectId],
+    queryFn: () => commentsApi.listCommentCounts(projectId as string),
+    enabled: !!projectId,
+  });
+}
+
+export function useCreateComment(taskId: string | null, projectId: string | null) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (body: string) => commentsApi.createComment(taskId as string, body),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["comments", taskId] });
+      queryClient.invalidateQueries({ queryKey: ["comment-counts", projectId] });
+    },
+  });
+}
+
+export function useDeleteComment(taskId: string | null, projectId: string | null) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (commentId: string) => commentsApi.deleteComment(commentId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["comments", taskId] });
+      queryClient.invalidateQueries({ queryKey: ["comment-counts", projectId] });
+    },
   });
 }

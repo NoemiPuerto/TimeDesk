@@ -1,16 +1,20 @@
 import { useState, type FormEvent } from "react";
+import { useAuth } from "../auth/AuthProvider";
 import { useProjectMembers } from "../projects/hooks";
 import type { Priority, Task } from "./api";
 import {
   useAddTaskAssignee,
   useAddTaskTag,
+  useCreateComment,
   useCreateTag,
+  useDeleteComment,
   useDeleteTask,
   useProjectTags,
   useRemoveTaskAssignee,
   useRemoveTaskTag,
   useRenameTask,
   useTaskAssigneesMap,
+  useTaskComments,
   useTaskTagsMap,
   useUpdateTaskDetails,
 } from "./hooks";
@@ -35,10 +39,15 @@ export function TaskDetailModal({
   const [newTagName, setNewTagName] = useState("");
   const [tagPickerOpen, setTagPickerOpen] = useState(false);
   const [assigneePickerOpen, setAssigneePickerOpen] = useState(false);
+  const [newComment, setNewComment] = useState("");
 
+  const { user } = useAuth();
   const renameTask = useRenameTask(projectId);
   const updateDetails = useUpdateTaskDetails(projectId);
   const deleteTask = useDeleteTask(projectId);
+  const { data: comments } = useTaskComments(task.id);
+  const createComment = useCreateComment(task.id, projectId);
+  const deleteComment = useDeleteComment(task.id, projectId);
 
   const { data: members } = useProjectMembers(projectId);
   const { data: allTags } = useProjectTags(projectId);
@@ -91,6 +100,14 @@ export function TaskDetailModal({
     if (!confirm(`¿Eliminar la tarea "${task.title}"?`)) return;
     deleteTask.mutate(task.id);
     onClose();
+  }
+
+  function handleAddComment(e: FormEvent) {
+    e.preventDefault();
+    const body = newComment.trim();
+    if (!body) return;
+    createComment.mutate(body);
+    setNewComment("");
   }
 
   return (
@@ -295,6 +312,66 @@ export function TaskDetailModal({
               )}
             </div>
           </div>
+        </div>
+
+        {/* Comments */}
+        <div className="flex flex-col gap-3 border-t border-outline-variant/20 pt-4">
+          <span className="text-xs font-bold uppercase tracking-widest text-on-surface-variant">
+            Comentarios {comments && comments.length > 0 ? `(${comments.length})` : ""}
+          </span>
+
+          <div className="flex flex-col gap-3 max-h-56 overflow-y-auto">
+            {comments?.length === 0 && (
+              <p className="text-xs text-on-surface-variant">Todavía no hay comentarios.</p>
+            )}
+            {comments?.map((c) => (
+              <div key={c.id} className="flex gap-2 group/comment">
+                <span className="w-6 h-6 rounded-full bg-secondary-container text-on-surface flex items-center justify-center text-[10px] font-bold shrink-0">
+                  {c.author.display_name.slice(0, 1).toUpperCase()}
+                </span>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-baseline gap-2">
+                    <span className="text-xs font-bold text-on-surface">{c.author.display_name}</span>
+                    <span className="text-[10px] text-on-surface-variant">
+                      {new Date(c.created_at).toLocaleString("es", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}
+                    </span>
+                    {c.user_id === user?.id && (
+                      <button
+                        type="button"
+                        onClick={() => deleteComment.mutate(c.id)}
+                        className="text-[10px] text-on-surface-variant hover:text-error opacity-0 group-hover/comment:opacity-100 transition-opacity"
+                      >
+                        Eliminar
+                      </button>
+                    )}
+                  </div>
+                  <p className="text-sm text-on-surface whitespace-pre-wrap break-words">{c.body}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <form onSubmit={handleAddComment} className="flex items-end gap-2">
+            <textarea
+              className="flex-1 bg-surface-container-lowest border border-outline-variant/30 rounded-md px-3 py-2 text-sm text-on-surface focus:outline-none focus:ring-2 focus:ring-primary-container min-h-[40px] resize-none"
+              placeholder="Escribe un comentario..."
+              value={newComment}
+              onChange={(e) => setNewComment(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && !e.shiftKey) {
+                  e.preventDefault();
+                  handleAddComment(e as unknown as FormEvent);
+                }
+              }}
+            />
+            <button
+              type="submit"
+              disabled={!newComment.trim()}
+              className="text-sm text-primary font-medium px-2 py-2 shrink-0 disabled:opacity-40"
+            >
+              Enviar
+            </button>
+          </form>
         </div>
 
         <div className="flex justify-end pt-2 border-t border-outline-variant/20">

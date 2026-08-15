@@ -45,6 +45,14 @@ export function useProjectRealtime(projectId: string | null) {
         { event: "*", schema: "public", table: "project_members", filter: `project_id=eq.${projectId}` },
         () => queryClient.invalidateQueries({ queryKey: ["project-members", projectId] }),
       )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "comments", filter: `project_id=eq.${projectId}` },
+        () => {
+          queryClient.invalidateQueries({ queryKey: ["comments"] });
+          queryClient.invalidateQueries({ queryKey: ["comment-counts", projectId] });
+        },
+      )
       .on("presence", { event: "sync" }, () => {
         const state = channel.presenceState<{ displayName: string }>();
         const members = Object.entries(state).map(([userId, presences]) => ({

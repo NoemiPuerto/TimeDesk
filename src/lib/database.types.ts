@@ -107,6 +107,55 @@ export type Database = {
           },
         ]
       }
+      comments: {
+        Row: {
+          body: string
+          created_at: string
+          id: string
+          project_id: string
+          task_id: string
+          user_id: string
+        }
+        Insert: {
+          body: string
+          created_at?: string
+          id?: string
+          project_id: string
+          task_id: string
+          user_id: string
+        }
+        Update: {
+          body?: string
+          created_at?: string
+          id?: string
+          project_id?: string
+          task_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "comments_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "comments_task_id_fkey"
+            columns: ["task_id"]
+            isOneToOne: false
+            referencedRelation: "tasks"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "comments_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           avatar_url: string | null
@@ -436,6 +485,23 @@ export type Database = {
         SetofOptions: {
           from: "*"
           to: "columns"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      create_comment: {
+        Args: { p_body: string; p_task_id: string }
+        Returns: {
+          body: string
+          created_at: string
+          id: string
+          project_id: string
+          task_id: string
+          user_id: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "comments"
           isOneToOne: true
           isSetofReturn: false
         }
