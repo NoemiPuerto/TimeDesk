@@ -51,8 +51,8 @@ export function TimerSection({ projectId }: { projectId: string }) {
   }
 
   return (
-    <section className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-      <div className="lg:col-span-2 bg-surface-container rounded-lg p-8 flex flex-col items-center justify-center relative overflow-hidden min-h-[220px]">
+    <section className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+      <div className="lg:col-span-3 bg-surface-container rounded-lg p-8 flex flex-col items-center justify-center relative overflow-hidden min-h-[220px]">
         {focusedTask ? (
           <div className="absolute top-6 left-6 flex items-center gap-2">
             <span className="w-2 h-2 rounded-full bg-primary-container" />
@@ -105,10 +105,10 @@ export function TimerSection({ projectId }: { projectId: string }) {
         )}
       </div>
 
-      <div className="bg-primary-container text-on-primary rounded-lg p-6 flex flex-col justify-between">
+      <div className="bg-primary-container text-on-primary rounded-lg p-5 flex flex-col justify-between gap-3">
         <span className="text-xs font-bold uppercase tracking-widest opacity-80">Sesión activa</span>
         <div>
-          <p className="text-2xl font-bold">{focusedTask ? focusedTask.title : "Ninguna"}</p>
+          <p className="text-base font-bold leading-snug line-clamp-2">{focusedTask ? focusedTask.title : "Ninguna"}</p>
           <p className="text-xs mt-1 opacity-70">
             {isRunningHere ? "Corriendo" : focusedTask ? "En pausa" : "Sin iniciar"}
           </p>

@@ -24,50 +24,45 @@ El usuario organiza su trabajo en **proyectos**. Cada proyecto tiene su propio *
 - Aplicación móvil (iOS/Android).
 - Facturación/invoicing a clientes en base a horas — **asumido fuera de v1 por no formar parte del problema principal descrito; confirmar con el usuario si se requiere antes de planear la fase que la incluiría.**
 
-## Sistema de diseño (fuente: Stitch)
+## Sistema de diseño
 
-Fuente: [Stitch project 2566146179284865822](https://stitch.withgoogle.com/projects/2566146179284865822), pantallas "TimeDesk - Project Kanban", "TimeDesk - Dashboard".
+**Paleta activa (decisión explícita del usuario, agosto 2026): fondo negro + rojo primario `#EB3619`.** Reemplaza la paleta verde salvia originalmente extraída de Stitch (ver "Origen histórico" abajo) — no es un tema claro/oscuro alternable, es la única piel de la app (`:root` y `.dark` tienen los mismos valores).
 
-El proyecto de Stitch contiene 3 exploraciones visuales distintas. Solo una es el sistema de diseño real del producto — las otras dos quedan descartadas para la implementación:
-
-- **✅ Usar — "Mi sistema de diseño"** (modo claro) + **"Stone & Sage"** (modo oscuro): mismo color de marca base (`#859c71`, verde salvia), uno en `colorMode: LIGHT` y otro en `colorMode: DARK`. Es el único de los tres con un documento de diseño escrito específicamente para TimeDesk ("calm, focused, grounded"; Display = Timer, Heading = Secciones, Body = Tareas). Las pantallas "Project Kanban (Light Mode) - Correct Sidebar Selection" y "Dark Mode - Timer Active Only" usan estos tokens.
-- **❌ Descartar — "Graphite Draft" / "The Living Blueprint"**: paleta monocromática tipo boceto de arquitecto, usada solo en las pantallas "Dashboard Wireframe" y "Dashboard - Kanban View". Su propio doc de diseño la describe como fase conceptual/wireframe, no como piel final.
-
-**Inconsistencia detectada y resuelta**: "Mi sistema de diseño" especifica tipografía **Inter**; "Stone & Sage" (su contraparte oscura) especifica **Manrope**. Para mantener una sola identidad tipográfica entre modo claro y oscuro, se usa **Inter** en ambos. Los valores de `border-radius` del HTML autogenerado por Stitch (`0.125rem` a `0.75rem`, con `rounded-full` que no produce círculos reales) no coinciden con la escala documentada en el design doc; se usa la escala documentada, más consistente:
+### Tokens de color
 
 | Token | Valor |
+|---|---|
+| `background` / `surface` | `#000000` |
+| `surface-container-lowest` | `#0d0d0d` |
+| `surface-container-low` | `#161616` |
+| `surface-container` | `#1f1f1f` |
+| `surface-container-high` | `#292929` |
+| `surface-container-highest` | `#333333` |
+| `on-background` / `on-surface` | `#f5f5f5` |
+| `on-surface-variant` | `#a3a3a3` |
+| `outline` | `#666666` |
+| `outline-variant` | `#383838` |
+| `primary` / `primary-container` | `#eb3619` |
+| `on-primary` | `#ffffff` |
+| `secondary` | `#d4d4d4` |
+| `secondary-container` | `#292929` |
+| `error` | `#ff5233` (distinto de `primary` a propósito, para no confundir "marca" con "error/peligro") |
+
+| Token de radio | Valor |
 |---|---|
 | `radius.sm` | 6px (inputs, controles pequeños) |
 | `radius.md` | 10px (cards, contenedores) |
 | `radius.lg` | 16px (secciones principales) |
 | `radius.full` | 9999px (pills, tags, botones circulares del timer) |
 
-### Tokens de color
-
-| Token | Claro | Oscuro |
-|---|---|---|
-| `background` / `surface` | `#fef9ed` | `#111410` |
-| `surface-container-lowest` | `#ffffff` | `#0c0f0b` |
-| `surface-container-low` | `#f8f3e7` | `#191c18` |
-| `surface-container` | `#f3ede1` | `#1d201c` |
-| `surface-container-high` | `#ede8dc` | `#282b26` |
-| `surface-container-highest` | `#e7e2d6` | `#333630` |
-| `on-background` / `on-surface` | `#1d1c14` | `#e1e3db` |
-| `on-surface-variant` | `#44483f` | `#c4c8bc` |
-| `outline` | `#75786e` | `#8e9287` |
-| `outline-variant` | `#c4c8bc` | `#44483f` |
-| `primary` | `#4f653e` | `#b6cea0` |
-| `primary-container` | `#859c71` | `#859c71` |
-| `on-primary` | `#ffffff` | `#223514` |
-| `secondary` | `#556344` | `#c0cab3` |
-| `secondary-container` | `#d5e5be` | `#434c3b` |
-| `error` | `#ba1a1a` | `#ffb4ab` |
-
-### Principios de UI (heredados del design doc)
+### Principios de UI
 - Diseño plano por defecto: sin sombras pesadas, separación por contraste tonal entre superficies (`surface` → `surface-container` → `surface-container-high`), no por líneas divisorias.
-- Jerarquía tipográfica: Display grande para el timer activo, Heading para secciones, Body para tareas, Caption para metadatos.
+- Jerarquía tipográfica: Display grande para el timer activo, Heading para secciones, Body para tareas, Caption para metadatos. Tipografía: **Inter**.
 - Una sola acción primaria dominante por vista (botón `primary-container` sólido); acciones secundarias en outline/ghost.
-- Layout base validado en las pantallas: sidebar fijo de navegación (Timer/Tasks/Analytics/Settings), header superior con búsqueda, sección "bento" del timer activo + tarjetas de stats, y kanban de 3 columnas (To Do / In Progress / Done) debajo — coherente con las columnas personalizables por proyecto definidas en la arquitectura.
+- Layout: sidebar fijo de navegación (Timer/Tasks/Analytics/Settings), header superior, sección "bento" del timer activo (más ancha que la tarjeta de "sesión activa" contigua) + kanban personalizable debajo. Columnas de kanban a `w-64`; controles secundarios (añadir columna) como ícono compacto con tooltip, no como input de ancho completo, para minimizar el scroll horizontal del tablero.
+
+### Origen histórico (superseded)
+La paleta original venía de [Stitch project 2566146179284865822](https://stitch.withgoogle.com/projects/2566146179284865822) (verde salvia `#859c71`, fondo crema/oscuro, tipografía Inter) — ver el historial de git de este archivo para la tabla de tokens completa si hace falta retomarla. Los *principios* de layout y jerarquía tipográfica de esa exploración siguen vigentes; solo la paleta de color cambió.
 
 ## Stack tecnológico
 
@@ -75,7 +70,7 @@ El proyecto de Stitch contiene 3 exploraciones visuales distintas. Solo una es e
 |---|---|---|
 | Shell de escritorio | **Tauri** (Rust) | Binarios livianos, bajo consumo de memoria, mejor para una app que corre en segundo plano/bandeja del sistema que Electron. |
 | Frontend | **React + TypeScript + Vite** | Ecosistema maduro, tipado fuerte, DX rápida. |
-| Estilos/UI | **Tailwind CSS + shadcn/ui**, tokens y tipografía **Inter** según el [sistema de diseño](#sistema-de-diseño-fuente-stitch) de Stitch | Componentes accesibles y personalizables; paleta y radios ya validados en las pantallas de Stitch, no se diseña de cero. |
+| Estilos/UI | **Tailwind CSS + shadcn/ui**, tokens y tipografía **Inter** según el [sistema de diseño](#sistema-de-diseño) (negro + rojo `#EB3619`) | Componentes accesibles y personalizables; tokens centralizados en `src/index.css`, no hardcodeados por componente. |
 | Drag & drop (kanban) | **dnd-kit** | Estándar actual para tableros kanban en React, accesible y performante. |
 | Estado servidor | **TanStack Query** | Cache y sincronización de datos remotos (Supabase). |
 | Estado local/UI | **Zustand** | Estado del timer activo, UI, sin boilerplate. |
@@ -97,6 +92,6 @@ El proyecto de Stitch contiene 3 exploraciones visuales distintas. Solo una es e
 - No construir sync/local-first todavía — la arquitectura cloud-first no debe complicarse con una capa de sincronización offline no solicitada.
 - Cambios en el esquema de la base de datos (Supabase/Postgres) y en las políticas de RLS se explican antes de aplicarse, dado que afectan datos compartidos entre miembros de un proyecto.
 - Mantener el kanban y el timer como los dos núcleos del producto: cualquier feature nueva se evalúa contra si refuerza o distrae de esos dos flujos.
-- Toda UI nueva parte de los tokens y layouts del [sistema de diseño](#sistema-de-diseño-fuente-stitch) (Stitch, variante "Mi sistema de diseño" / "Stone & Sage"). No introducir colores, radios o fuentes fuera de esa paleta sin confirmarlo antes; no usar la piel "Graphite Draft" (descartada).
+- Toda UI nueva parte de los tokens del [sistema de diseño](#sistema-de-diseño) (fondo negro, primario `#EB3619`). No introducir colores, radios o fuentes fuera de esa paleta sin confirmarlo antes.
 - **Los tests e2e (`e2e/`, Playwright) corren contra el Supabase real**, no un mock: cada test crea una cuenta (`noemipuertor+e2e-*@gmail.com`) y datos propios. No hay limpieza automática de usuarios de auth (necesitaría la service role key, que este proyecto no maneja) — solo los proyectos/tareas quedan limpiables vía RLS normal. Aceptado como límite conocido dado el tamaño del proyecto; si el volumen de cuentas de prueba se vuelve un problema, resolverlo con un cron de limpieza usando la service role key, no manejándola desde el cliente.
 - **Errores de mutaciones se muestran solos**: el `MutationCache` global en `queryClient.ts` empuja cualquier error de mutación no capturado a un toast (`useToastStore`). Una mutación que ya maneja su propio error inline (ej. `useInviteMember`) debe marcar `meta: { suppressToast: true }` para no duplicar el aviso.

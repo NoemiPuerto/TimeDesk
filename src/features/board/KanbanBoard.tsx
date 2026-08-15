@@ -64,12 +64,18 @@ export function KanbanBoard({ projectId }: { projectId: string }) {
     reorderTasks.mutate(updates);
   }
 
+  const [addingColumn, setAddingColumn] = useState(false);
+
   function handleAddColumn(e: FormEvent) {
     e.preventDefault();
     const name = newColumnName.trim();
-    if (!name) return;
+    if (!name) {
+      setAddingColumn(false);
+      return;
+    }
     createColumn.mutate(name);
     setNewColumnName("");
+    setAddingColumn(false);
   }
 
   if (columnsLoading || tasksLoading) {
@@ -83,19 +89,34 @@ export function KanbanBoard({ projectId }: { projectId: string }) {
           <Column key={column.id} column={column} tasks={tasksByColumn.get(column.id) ?? []} projectId={projectId} />
         ))}
 
-        <form onSubmit={handleAddColumn} className="w-64 shrink-0 flex gap-2">
-          <input
-            className="flex-1 bg-surface-container-low border border-outline-variant/30 rounded-md px-3 py-2 text-sm placeholder-outline/60 focus:outline-none focus:ring-2 focus:ring-primary-container"
-            placeholder="+ Añadir columna"
-            value={newColumnName}
-            onChange={(e) => setNewColumnName(e.target.value)}
-          />
-          {newColumnName.trim() && (
-            <button type="submit" className="text-sm text-primary font-medium px-2 shrink-0">
-              Añadir
-            </button>
-          )}
-        </form>
+        {addingColumn ? (
+          <form onSubmit={handleAddColumn} className="w-64 shrink-0 flex gap-2">
+            <input
+              autoFocus
+              className="flex-1 bg-surface-container-low border border-outline-variant/30 rounded-md px-3 py-2 text-sm placeholder-outline/60 focus:outline-none focus:ring-2 focus:ring-primary-container"
+              placeholder="Nombre de la columna"
+              value={newColumnName}
+              onChange={(e) => setNewColumnName(e.target.value)}
+              onBlur={() => !newColumnName.trim() && setAddingColumn(false)}
+              onKeyDown={(e) => e.key === "Escape" && setAddingColumn(false)}
+            />
+            {newColumnName.trim() && (
+              <button type="submit" className="text-sm text-primary font-medium px-2 shrink-0">
+                Añadir
+              </button>
+            )}
+          </form>
+        ) : (
+          <button
+            type="button"
+            title="Añadir columna"
+            aria-label="Añadir columna"
+            onClick={() => setAddingColumn(true)}
+            className="shrink-0 w-9 h-9 flex items-center justify-center rounded-md border border-outline-variant/30 text-on-surface-variant hover:text-primary hover:border-primary transition-colors"
+          >
+            +
+          </button>
+        )}
       </div>
     </DndContext>
   );

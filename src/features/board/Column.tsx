@@ -42,7 +42,7 @@ export function Column({
   }
 
   return (
-    <div className="flex flex-col gap-3 w-80 shrink-0">
+    <div className="flex flex-col gap-3 w-64 shrink-0">
       <div className="flex items-center justify-between px-1 group/header">
         {editingName ? (
           <input

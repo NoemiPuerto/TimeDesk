@@ -3,24 +3,24 @@
 @custom-variant dark (&:is(.dark *));
 
 :root {
-  --background: #fef9ed;
-  --surface: #fef9ed;
-  --surface-container-lowest: #ffffff;
-  --surface-container-low: #f8f3e7;
-  --surface-container: #f3ede1;
-  --surface-container-high: #ede8dc;
-  --surface-container-highest: #e7e2d6;
-  --on-background: #1d1c14;
-  --on-surface: #1d1c14;
-  --on-surface-variant: #44483f;
-  --outline: #75786e;
-  --outline-variant: #c4c8bc;
-  --primary: #4f653e;
-  --primary-container: #859c71;
+  --background: #000000;
+  --surface: #000000;
+  --surface-container-lowest: #0d0d0d;
+  --surface-container-low: #161616;
+  --surface-container: #1f1f1f;
+  --surface-container-high: #292929;
+  --surface-container-highest: #333333;
+  --on-background: #f5f5f5;
+  --on-surface: #f5f5f5;
+  --on-surface-variant: #a3a3a3;
+  --outline: #666666;
+  --outline-variant: #383838;
+  --primary: #eb3619;
+  --primary-container: #eb3619;
   --on-primary: #ffffff;
-  --secondary: #556344;
-  --secondary-container: #d5e5be;
-  --error: #ba1a1a;
+  --secondary: #d4d4d4;
+  --secondary-container: #292929;
+  --error: #ff5233;
 
   --radius-sm: 6px;
   --radius-md: 10px;
@@ -29,24 +29,24 @@
 }
 
 .dark {
-  --background: #111410;
-  --surface: #111410;
-  --surface-container-lowest: #0c0f0b;
-  --surface-container-low: #191c18;
-  --surface-container: #1d201c;
-  --surface-container-high: #282b26;
-  --surface-container-highest: #333630;
-  --on-background: #e1e3db;
-  --on-surface: #e1e3db;
-  --on-surface-variant: #c4c8bc;
-  --outline: #8e9287;
-  --outline-variant: #44483f;
-  --primary: #b6cea0;
-  --primary-container: #859c71;
-  --on-primary: #223514;
-  --secondary: #c0cab3;
-  --secondary-container: #434c3b;
-  --error: #ffb4ab;
+  --background: #000000;
+  --surface: #000000;
+  --surface-container-lowest: #0d0d0d;
+  --surface-container-low: #161616;
+  --surface-container: #1f1f1f;
+  --surface-container-high: #292929;
+  --surface-container-highest: #333333;
+  --on-background: #f5f5f5;
+  --on-surface: #f5f5f5;
+  --on-surface-variant: #a3a3a3;
+  --outline: #666666;
+  --outline-variant: #383838;
+  --primary: #eb3619;
+  --primary-container: #eb3619;
+  --on-primary: #ffffff;
+  --secondary: #d4d4d4;
+  --secondary-container: #292929;
+  --error: #ff5233;
 }
 
 @theme inline {
