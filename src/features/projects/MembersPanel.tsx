@@ -1,5 +1,7 @@
 import { useState, type FormEvent } from "react";
+import { Avatar } from "../../components/Avatar";
 import { useAuth } from "../auth/AuthProvider";
+import { useAppStore } from "../../store/useAppStore";
 import { useTeamMembers } from "../teams/hooks";
 import { useInviteMember, useProjectMembers, useRemoveMember } from "./hooks";
 
@@ -13,6 +15,7 @@ export function MembersPanel({
   teamId?: string | null;
 }) {
   const { user } = useAuth();
+  const { selectProject } = useAppStore();
   const { data: members } = useProjectMembers(projectId);
   const { data: teamMembers } = useTeamMembers(teamId ?? null);
   const inviteMember = useInviteMember(projectId);
@@ -25,6 +28,14 @@ export function MembersPanel({
   const isTeamAdmin = teamMembers?.some((m) => m.user_id === user?.id && m.role === "admin") ?? false;
   const canManage = isOwner || isTeamAdmin;
   const atCapacity = (members?.length ?? 0) >= 4;
+
+  function handleLeave() {
+    if (!user) return;
+    if (!confirm("¿Salir de este proyecto? Perderás acceso a sus tareas y tiempo registrado.")) return;
+    removeMember.mutate(user.id);
+    selectProject(null);
+    setOpen(false);
+  }
 
   async function handleInvite(e: FormEvent) {
     e.preventDefault();
@@ -46,12 +57,8 @@ export function MembersPanel({
         aria-label="Miembros del proyecto"
       >
         {members?.map((m) => (
-          <div
-            key={m.user_id}
-            title={m.profile.display_name}
-            className="w-8 h-8 rounded-full border-2 border-surface bg-secondary-container text-on-surface flex items-center justify-center text-xs font-bold"
-          >
-            {m.profile.display_name.slice(0, 1).toUpperCase()}
+          <div key={m.user_id} title={m.profile.display_name} className="border-2 border-surface rounded-full">
+            <Avatar url={m.profile.avatar_url} name={m.profile.display_name} size="w-8 h-8" />
           </div>
         ))}
         <div className="w-8 h-8 rounded-full border-2 border-surface bg-surface-container-high text-on-surface-variant flex items-center justify-center text-xs">
@@ -63,8 +70,9 @@ export function MembersPanel({
         <div className="absolute right-0 mt-2 w-72 bg-surface-container-lowest border border-outline-variant/30 rounded-md shadow-lg z-50 p-3 flex flex-col gap-3">
           <ul className="flex flex-col gap-2">
             {members?.map((m) => (
-              <li key={m.user_id} className="flex items-center justify-between gap-2 text-sm">
-                <div className="min-w-0">
+              <li key={m.user_id} className="flex items-center gap-2 text-sm">
+                <Avatar url={m.profile.avatar_url} name={m.profile.display_name} size="w-7 h-7" textSize="text-[10px]" />
+                <div className="min-w-0 flex-1">
                   <p className="text-on-surface truncate">{m.profile.display_name}</p>
                   <p className="text-on-surface-variant text-xs truncate">{m.profile.email}</p>
                 </div>
@@ -107,6 +115,16 @@ export function MembersPanel({
                 Invitar
               </button>
             </form>
+          )}
+
+          {!isOwner && (
+            <button
+              type="button"
+              onClick={handleLeave}
+              className="text-xs text-error text-left pt-2 border-t border-outline-variant/20"
+            >
+              Salir del proyecto
+            </button>
           )}
         </div>
       )}

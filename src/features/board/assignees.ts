@@ -3,13 +3,14 @@ import { supabase } from "../../lib/supabase";
 export type Assignee = {
   id: string;
   display_name: string;
+  avatar_url: string | null;
 };
 
 /** Map of task_id -> assignees, for every task in the project, in one query. */
 export async function listAllTaskAssignees(projectId: string): Promise<Map<string, Assignee[]>> {
   const { data, error } = await supabase
     .from("task_assignees")
-    .select("task_id, user:profiles(id, display_name), task:tasks!inner(project_id)")
+    .select("task_id, user:profiles(id, display_name, avatar_url), task:tasks!inner(project_id)")
     .eq("task.project_id", projectId);
   if (error) throw error;
 

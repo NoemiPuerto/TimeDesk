@@ -1,7 +1,10 @@
-import { useState, type FormEvent } from "react";
-import { CheckCircleIcon, TrashIcon } from "../../components/icons";
+import { useRef, useState, type FormEvent } from "react";
+import { Avatar } from "../../components/Avatar";
+import { CheckCircleIcon, DownloadIcon, PaperclipIcon, TrashIcon } from "../../components/icons";
 import { useAuth } from "../auth/AuthProvider";
 import { useProjectMembers } from "../projects/hooks";
+import { getAttachmentDownloadUrl, MAX_ATTACHMENT_SIZE } from "./attachments";
+import { formatBytes } from "./attachmentUtils";
 import type { Priority, Task } from "./api";
 import { DueDatePicker } from "./DueDatePicker";
 import {
@@ -10,6 +13,7 @@ import {
   useCreateComment,
   useCreateSubtask,
   useCreateTag,
+  useDeleteAttachment,
   useDeleteComment,
   useDeleteSubtask,
   useDeleteTask,
@@ -18,11 +22,13 @@ import {
   useRemoveTaskTag,
   useRenameTask,
   useTaskAssigneesMap,
+  useTaskAttachments,
   useTaskComments,
   useTaskSubtasks,
   useTaskTagsMap,
   useToggleSubtask,
   useUpdateTaskDetails,
+  useUploadAttachment,
 } from "./hooks";
 
 const PRIORITIES: { value: Priority; label: string; color: string }[] = [
@@ -47,6 +53,8 @@ export function TaskDetailModal({
   const [assigneePickerOpen, setAssigneePickerOpen] = useState(false);
   const [newComment, setNewComment] = useState("");
   const [newSubtaskTitle, setNewSubtaskTitle] = useState("");
+  const [attachmentError, setAttachmentError] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const { user } = useAuth();
   const renameTask = useRenameTask(projectId);
@@ -59,6 +67,9 @@ export function TaskDetailModal({
   const createSubtask = useCreateSubtask(task.id, projectId);
   const toggleSubtask = useToggleSubtask(task.id, projectId);
   const deleteSubtask = useDeleteSubtask(task.id, projectId);
+  const { data: attachments } = useTaskAttachments(task.id);
+  const uploadAttachment = useUploadAttachment(task.id, projectId);
+  const deleteAttachment = useDeleteAttachment(task.id, projectId);
 
   const { data: members } = useProjectMembers(projectId);
   const { data: allTags } = useProjectTags(projectId);
@@ -127,6 +138,33 @@ export function TaskDetailModal({
     if (!title) return;
     createSubtask.mutate(title);
     setNewSubtaskTitle("");
+  }
+
+  async function handleFileSelected(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    setAttachmentError(null);
+    try {
+      await uploadAttachment.mutateAsync(file);
+    } catch (err) {
+      setAttachmentError(err instanceof Error ? err.message : "No se pudo subir el archivo.");
+    }
+  }
+
+  async function handleDownload(storagePath: string) {
+    // Open the tab synchronously (inside the click handler) so browsers don't
+    // block it as a popup — window.open() after an await loses the
+    // user-gesture context and gets blocked silently.
+    const tab = window.open("", "_blank");
+    try {
+      const url = await getAttachmentDownloadUrl(storagePath);
+      if (tab) tab.location.href = url;
+      else window.open(url, "_blank");
+    } catch (err) {
+      tab?.close();
+      setAttachmentError(err instanceof Error ? err.message : "No se pudo abrir el archivo.");
+    }
   }
 
   return (
@@ -276,9 +314,7 @@ export function TaskDetailModal({
                 key={a.id}
                 className="flex items-center gap-1.5 pl-1 pr-2 py-1 rounded-full text-xs font-medium bg-surface-container-high text-on-surface"
               >
-                <span className="w-5 h-5 rounded-full bg-secondary-container text-on-surface flex items-center justify-center text-[10px] font-bold">
-                  {a.display_name.slice(0, 1).toUpperCase()}
-                </span>
+                <Avatar url={a.avatar_url} name={a.display_name} size="w-5 h-5" textSize="text-[10px]" />
                 {a.display_name}
                 <button
                   type="button"
@@ -383,6 +419,63 @@ export function TaskDetailModal({
           </form>
         </div>
 
+        {/* Attachments */}
+        <div className="flex flex-col gap-3 border-t border-outline-variant/20 pt-4">
+          <span className="text-xs font-bold uppercase tracking-widest text-on-surface-variant">
+            Archivos {attachments && attachments.length > 0 ? `(${attachments.length})` : ""}
+          </span>
+
+          {attachments && attachments.length > 0 && (
+            <ul className="flex flex-col gap-1">
+              {attachments.map((a) => (
+                <li
+                  key={a.id}
+                  className="flex items-center gap-2 group/file bg-surface-container-lowest rounded-sm px-2 py-1.5"
+                >
+                  <PaperclipIcon className="w-3.5 h-3.5 text-on-surface-variant shrink-0" />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm text-on-surface truncate">{a.filename}</p>
+                    <p className="text-[10px] text-on-surface-variant">
+                      {formatBytes(a.size_bytes)} · {a.uploader.display_name}
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => handleDownload(a.storage_path)}
+                    aria-label={`Descargar ${a.filename}`}
+                    className="text-on-surface-variant hover:text-primary transition-colors shrink-0"
+                  >
+                    <DownloadIcon className="w-3.5 h-3.5" />
+                  </button>
+                  {a.uploaded_by === user?.id && (
+                    <button
+                      type="button"
+                      onClick={() => deleteAttachment.mutate({ attachmentId: a.id, storagePath: a.storage_path })}
+                      aria-label={`Eliminar ${a.filename}`}
+                      className="text-outline opacity-0 group-hover/file:opacity-100 hover:text-error transition-opacity shrink-0"
+                    >
+                      <TrashIcon className="w-3.5 h-3.5" />
+                    </button>
+                  )}
+                </li>
+              ))}
+            </ul>
+          )}
+
+          {attachmentError && <p className="text-error text-xs">{attachmentError}</p>}
+
+          <input ref={fileInputRef} type="file" onChange={handleFileSelected} className="hidden" />
+          <button
+            type="button"
+            onClick={() => fileInputRef.current?.click()}
+            disabled={uploadAttachment.isPending}
+            className="self-start flex items-center gap-1.5 text-xs text-primary font-medium disabled:opacity-40"
+          >
+            <PaperclipIcon className="w-3.5 h-3.5" />
+            {uploadAttachment.isPending ? "Subiendo..." : `Adjuntar archivo (máx. ${MAX_ATTACHMENT_SIZE / 1024 / 1024}MB)`}
+          </button>
+        </div>
+
         {/* Comments */}
         <div className="flex flex-col gap-3 border-t border-outline-variant/20 pt-4">
           <span className="text-xs font-bold uppercase tracking-widest text-on-surface-variant">
@@ -395,9 +488,7 @@ export function TaskDetailModal({
             )}
             {comments?.map((c) => (
               <div key={c.id} className="flex gap-2 group/comment">
-                <span className="w-6 h-6 rounded-full bg-secondary-container text-on-surface flex items-center justify-center text-[10px] font-bold shrink-0">
-                  {c.author.display_name.slice(0, 1).toUpperCase()}
-                </span>
+                <Avatar url={c.author.avatar_url} name={c.author.display_name} size="w-6 h-6" textSize="text-[10px]" />
                 <div className="flex-1 min-w-0">
                   <div className="flex items-baseline gap-2">
                     <span className="text-xs font-bold text-on-surface">{c.author.display_name}</span>

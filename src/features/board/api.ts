@@ -56,6 +56,14 @@ export async function deleteColumn(columnId: string): Promise<void> {
   if (error) throw error;
 }
 
+export async function reorderColumns(updates: { id: string; position: number }[]): Promise<void> {
+  const results = await Promise.all(
+    updates.map((u) => supabase.from("columns").update({ position: u.position }).eq("id", u.id)),
+  );
+  const failed = results.find((r) => r.error);
+  if (failed?.error) throw failed.error;
+}
+
 export async function listTasks(projectId: string): Promise<Task[]> {
   const { data, error } = await supabase
     .from("tasks")

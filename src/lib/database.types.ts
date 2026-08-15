@@ -14,6 +14,64 @@ export type Database = {
   }
   public: {
     Tables: {
+      attachments: {
+        Row: {
+          content_type: string | null
+          created_at: string
+          filename: string
+          id: string
+          project_id: string
+          size_bytes: number
+          storage_path: string
+          task_id: string
+          uploaded_by: string
+        }
+        Insert: {
+          content_type?: string | null
+          created_at?: string
+          filename: string
+          id?: string
+          project_id: string
+          size_bytes: number
+          storage_path: string
+          task_id: string
+          uploaded_by: string
+        }
+        Update: {
+          content_type?: string | null
+          created_at?: string
+          filename?: string
+          id?: string
+          project_id?: string
+          size_bytes?: number
+          storage_path?: string
+          task_id?: string
+          uploaded_by?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "attachments_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "attachments_task_id_fkey"
+            columns: ["task_id"]
+            isOneToOne: false
+            referencedRelation: "tasks"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "attachments_uploaded_by_fkey"
+            columns: ["uploaded_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       boards: {
         Row: {
           created_at: string
@@ -478,18 +536,21 @@ export type Database = {
       }
       teams: {
         Row: {
+          avatar_url: string | null
           created_at: string
           id: string
           name: string
           owner_id: string
         }
         Insert: {
+          avatar_url?: string | null
           created_at?: string
           id?: string
           name: string
           owner_id: string
         }
         Update: {
+          avatar_url?: string | null
           created_at?: string
           id?: string
           name?: string
@@ -566,6 +627,32 @@ export type Database = {
       add_task_tag: {
         Args: { p_tag_id: string; p_task_id: string }
         Returns: undefined
+      }
+      create_attachment: {
+        Args: {
+          p_content_type?: string
+          p_filename: string
+          p_size_bytes: number
+          p_storage_path: string
+          p_task_id: string
+        }
+        Returns: {
+          content_type: string | null
+          created_at: string
+          filename: string
+          id: string
+          project_id: string
+          size_bytes: number
+          storage_path: string
+          task_id: string
+          uploaded_by: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "attachments"
+          isOneToOne: true
+          isSetofReturn: false
+        }
       }
       create_column: {
         Args: { p_name: string; p_project_id: string }
@@ -678,6 +765,7 @@ export type Database = {
       create_team: {
         Args: { p_name: string }
         Returns: {
+          avatar_url: string | null
           created_at: string
           id: string
           name: string
@@ -733,6 +821,10 @@ export type Database = {
         Returns: boolean
       }
       is_team_member: {
+        Args: { p_team_id: string; p_user_id: string }
+        Returns: boolean
+      }
+      is_team_owner: {
         Args: { p_team_id: string; p_user_id: string }
         Returns: boolean
       }

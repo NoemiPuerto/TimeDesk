@@ -1,4 +1,5 @@
 import { useState, type FormEvent } from "react";
+import { Avatar } from "../../components/Avatar";
 import { useAppStore } from "../../store/useAppStore";
 import { useCreateTeam, useMyTeams } from "./hooks";
 
@@ -31,7 +32,10 @@ export function TeamSwitcher() {
         className="w-full flex items-center justify-between px-1 py-1.5 rounded-md text-xs text-on-surface-variant hover:bg-surface-container-high transition-colors"
         onClick={() => setOpen((o) => !o)}
       >
-        <span className="truncate">{selected ? selected.name : "Personal"}</span>
+        <span className="flex items-center gap-2 min-w-0">
+          {selected && <Avatar url={selected.avatar_url} name={selected.name} size="w-5 h-5" textSize="text-[10px]" />}
+          <span className="truncate">{selected ? selected.name : "Personal"}</span>
+        </span>
         <span className="shrink-0">▾</span>
       </button>
 
@@ -58,7 +62,7 @@ export function TeamSwitcher() {
                   <li key={team.id}>
                     <button
                       type="button"
-                      className={`w-full text-left px-2 py-1.5 rounded-sm text-sm hover:bg-surface-container-high transition-colors ${
+                      className={`w-full flex items-center gap-2 text-left px-2 py-1.5 rounded-sm text-sm hover:bg-surface-container-high transition-colors ${
                         team.id === selectedTeamId ? "text-primary font-medium" : "text-on-surface"
                       }`}
                       onClick={() => {
@@ -66,7 +70,8 @@ export function TeamSwitcher() {
                         setOpen(false);
                       }}
                     >
-                      {team.name}
+                      <Avatar url={team.avatar_url} name={team.name} size="w-5 h-5" textSize="text-[10px]" />
+                      <span className="truncate">{team.name}</span>
                     </button>
                   </li>
                 ))}

@@ -35,10 +35,39 @@ export function useInviteMember(projectId: string | null) {
   });
 }
 
+export function useUpdateProject(projectId: string | null) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (details: { name?: string; description?: string | null }) =>
+      api.updateProject(projectId as string, details),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["projects"] });
+      queryClient.invalidateQueries({ queryKey: ["team-projects"] });
+    },
+  });
+}
+
+export function useDeleteProject() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (projectId: string) => api.deleteProject(projectId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["projects"] });
+      queryClient.invalidateQueries({ queryKey: ["team-projects"] });
+    },
+  });
+}
+
 export function useRemoveMember(projectId: string | null) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (userId: string) => api.removeMember(projectId as string, userId),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["project-members", projectId] }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["project-members", projectId] });
+      // Also covers self-leave: listMyProjects/listTeamProjects only return
+      // projects the caller is still a member of.
+      queryClient.invalidateQueries({ queryKey: ["projects"] });
+      queryClient.invalidateQueries({ queryKey: ["team-projects"] });
+    },
   });
 }

@@ -1,9 +1,9 @@
 import { DndContext, closestCorners, PointerSensor, useSensor, useSensors, type DragEndEvent } from "@dnd-kit/core";
-import { arrayMove } from "@dnd-kit/sortable";
+import { arrayMove, horizontalListSortingStrategy, SortableContext } from "@dnd-kit/sortable";
 import { useMemo, useState, type FormEvent } from "react";
 import type { Task } from "./api";
-import { applyTaskFilters, DEFAULT_TASK_FILTERS, type TaskFilters } from "./filters";
-import { useColumns, useCreateColumn, useReorderTasks, useTasks } from "./hooks";
+import { applyTaskFilters, DEFAULT_TASK_FILTERS, hasActiveFilters, type TaskFilters } from "./filters";
+import { useColumns, useCreateColumn, useReorderColumns, useReorderTasks, useTasks } from "./hooks";
 import { Column } from "./Column";
 import { QuickAddTask } from "./QuickAddTask";
 
@@ -20,6 +20,7 @@ export function KanbanBoard({
   const { data: tasks, isLoading: tasksLoading } = useTasks(projectId);
   const createColumn = useCreateColumn(projectId);
   const reorderTasks = useReorderTasks(projectId);
+  const reorderColumns = useReorderColumns(projectId);
   const [newColumnName, setNewColumnName] = useState("");
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 4 } }));
@@ -39,9 +40,45 @@ export function KanbanBoard({
     return map;
   }, [filteredTasks, filters.sortBy]);
 
+  function handleColumnDragEnd(activeColId: string, overColId: string) {
+    if (!columns || activeColId === overColId) return;
+
+    const ids = columns.map((c) => c.id);
+    const oldIndex = ids.indexOf(activeColId);
+    const newIndex = ids.indexOf(overColId);
+    if (oldIndex === -1 || newIndex === -1) return;
+
+    const reordered = arrayMove(ids, oldIndex, newIndex);
+    reorderColumns.mutate(reordered.map((id, index) => ({ id, position: index })));
+  }
+
+  // Resolves the column a drop landed on, whichever element `over` actually
+  // is — the column's own drag handle, its (mostly empty) task-drop-zone, or
+  // one of its task cards. Nested sortable contexts make dnd-kit's collision
+  // detection land on the closest of any of those, not necessarily the
+  // column wrapper itself.
+  function resolveOverColumnId(over: NonNullable<DragEndEvent["over"]>): string | null {
+    const data = over.data.current as { type?: string; columnId?: string; task?: Task } | undefined;
+    if (data?.type === "column-sort" && data.columnId) return data.columnId;
+    if (data?.type === "column" && data.columnId) return data.columnId;
+    if (data?.type === "task" && data.task) return data.task.column_id;
+    const rawId = String(over.id);
+    return rawId.startsWith("col-") ? rawId.slice(4) : rawId;
+  }
+
   function handleDragEnd(event: DragEndEvent) {
     const { active, over } = event;
-    if (!over || !tasks) return;
+    if (!over) return;
+
+    const activeData = active.data.current as { type?: string; columnId?: string } | undefined;
+    if (activeData?.type === "column-sort") {
+      const activeColId = activeData.columnId ?? String(active.id).replace(/^col-/, "");
+      const overColId = resolveOverColumnId(over);
+      if (overColId) handleColumnDragEnd(activeColId, overColId);
+      return;
+    }
+
+    if (!tasks || hasActiveFilters(filters)) return;
 
     const activeTask = tasks.find((t) => t.id === active.id);
     if (!activeTask) return;
@@ -97,23 +134,33 @@ export function KanbanBoard({
   }
 
   const lastColumnId = columns && columns.length > 0 ? columns[columns.length - 1].id : null;
+  const tasksDragDisabled = hasActiveFilters(filters);
 
   return (
     <div className="flex flex-col gap-4">
       <QuickAddTask projectId={projectId} columns={columns ?? []} />
 
+      {tasksDragDisabled && (
+        <p className="text-xs text-on-surface-variant">
+          Quita los filtros para poder reordenar tareas arrastrándolas.
+        </p>
+      )}
+
       <DndContext sensors={sensors} collisionDetection={closestCorners} onDragEnd={handleDragEnd}>
         <div className="flex items-start gap-6 overflow-x-auto pb-4">
-          {(columns ?? []).map((column) => (
-            <Column
-              key={column.id}
-              column={column}
-              tasks={tasksByColumn.get(column.id) ?? []}
-              projectId={projectId}
-              isDoneColumn={column.id === lastColumnId}
-              onOpenTask={onOpenTask}
-            />
-          ))}
+          <SortableContext items={(columns ?? []).map((c) => `col-${c.id}`)} strategy={horizontalListSortingStrategy}>
+            {(columns ?? []).map((column) => (
+              <Column
+                key={column.id}
+                column={column}
+                tasks={tasksByColumn.get(column.id) ?? []}
+                projectId={projectId}
+                isDoneColumn={column.id === lastColumnId}
+                tasksDragDisabled={tasksDragDisabled}
+                onOpenTask={onOpenTask}
+              />
+            ))}
+          </SortableContext>
 
           {addingColumn ? (
             <form onSubmit={handleAddColumn} className="w-64 shrink-0 flex gap-2">

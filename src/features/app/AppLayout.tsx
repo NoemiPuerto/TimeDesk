@@ -1,8 +1,11 @@
-import { useEffect, useState } from "react";
-import { BarChartIcon, ClockIcon, KanbanIcon, LogOutIcon, SettingsIcon } from "../../components/icons";
+import { useEffect } from "react";
+import { AvatarUpload } from "../../components/Avatar";
+import { BarChartIcon, ClockIcon, GridIcon, KanbanIcon, LogOutIcon, SettingsIcon } from "../../components/icons";
 import { useAuth } from "../auth/AuthProvider";
+import { DashboardView } from "../dashboard/DashboardView";
 import { useMyProjects } from "../projects/hooks";
 import { MembersPanel } from "../projects/MembersPanel";
+import { ProjectSettings } from "../projects/ProjectSettings";
 import { ProjectSwitcher } from "../projects/ProjectSwitcher";
 import { useAppStore } from "../../store/useAppStore";
 import { TaskBoardArea } from "../board/TaskBoardArea";
@@ -10,11 +13,14 @@ import { TimerSection } from "../timer/TimerSection";
 import { AnalyticsView } from "../analytics/AnalyticsView";
 import { useProjectRealtime } from "../realtime/useProjectRealtime";
 import { useOnlineStatus } from "../../lib/useOnlineStatus";
+import { useMyProfile, useRemoveUserAvatar, useUploadUserAvatar } from "../profile/hooks";
+import { TeamSidebarMembers } from "../teams/TeamSidebarMembers";
 import { TeamSwitcher } from "../teams/TeamSwitcher";
 import { TeamMembersPanel } from "../teams/TeamMembersPanel";
 import { useMyTeams, useTeamProjects } from "../teams/hooks";
 
 const NAV_ITEMS = [
+  { key: "dashboard", label: "Dashboard", icon: GridIcon },
   { key: "timer", label: "Timer", icon: ClockIcon },
   { key: "tasks", label: "Tasks", icon: KanbanIcon },
   { key: "analytics", label: "Analytics", icon: BarChartIcon },
@@ -23,11 +29,13 @@ const NAV_ITEMS = [
 
 export function AppLayout() {
   const { user, signOut } = useAuth();
+  const { data: myProfile } = useMyProfile(user?.id ?? null);
+  const uploadAvatar = useUploadUserAvatar(user?.id ?? null);
+  const removeAvatar = useRemoveUserAvatar(user?.id ?? null);
   const { data: personalProjects, isLoading: personalLoading } = useMyProjects();
-  const { selectedProjectId, selectProject, selectedTeamId } = useAppStore();
+  const { selectedProjectId, selectProject, selectedTeamId, selectTeam, activeNav, setActiveNav } = useAppStore();
   const { data: teams } = useMyTeams();
   const { data: teamProjects, isLoading: teamProjectsLoading } = useTeamProjects(selectedTeamId);
-  const [activeNav, setActiveNav] = useState<(typeof NAV_ITEMS)[number]["key"]>("timer");
 
   const isLoading = selectedTeamId ? teamProjectsLoading : personalLoading;
   const personalOnly = (personalProjects ?? []).filter((p) => !p.team_id);
@@ -47,6 +55,12 @@ export function AppLayout() {
   const { onlineMembers } = useProjectRealtime(selectedProject?.id ?? null);
   const online = useOnlineStatus();
 
+  function handleOpenProject(project: { id: string; team_id: string | null }) {
+    selectTeam(project.team_id ?? null);
+    selectProject(project.id);
+    setActiveNav("tasks");
+  }
+
   return (
     <div className="min-h-screen bg-background text-on-background flex">
       {!online && (
@@ -61,6 +75,7 @@ export function AppLayout() {
 
         <TeamSwitcher />
         <ProjectSwitcher />
+        {selectedTeamId && <TeamSidebarMembers teamId={selectedTeamId} />}
 
         <nav className="flex-1 space-y-1 px-4 mt-6">
           {NAV_ITEMS.map((item) => (
@@ -80,33 +95,49 @@ export function AppLayout() {
           ))}
         </nav>
 
-        <div className="px-4 border-t border-outline-variant/20 pt-4">
-          <p className="text-xs text-on-surface-variant truncate mb-2">{user?.email}</p>
-          <button
-            type="button"
-            className="flex items-center gap-1.5 text-xs text-on-surface-variant hover:text-on-surface transition-colors"
-            onClick={signOut}
-          >
-            <LogOutIcon className="w-3.5 h-3.5" />
-            Cerrar sesión
-          </button>
+        <div className="px-4 border-t border-outline-variant/20 pt-4 flex items-center gap-3">
+          <AvatarUpload
+            url={myProfile?.avatar_url}
+            name={myProfile?.display_name ?? user?.email ?? "?"}
+            size="w-9 h-9"
+            onUpload={(file) => uploadAvatar.mutateAsync(file)}
+            onRemove={myProfile?.avatar_url ? () => removeAvatar.mutate() : undefined}
+          />
+          <div className="min-w-0 flex-1">
+            <p className="text-xs text-on-surface-variant truncate">{user?.email}</p>
+            <button
+              type="button"
+              className="flex items-center gap-1.5 text-xs text-on-surface-variant hover:text-on-surface transition-colors mt-1"
+              onClick={signOut}
+            >
+              <LogOutIcon className="w-3.5 h-3.5" />
+              Cerrar sesión
+            </button>
+          </div>
         </div>
       </aside>
 
       <main className="ml-64 flex-1 flex flex-col min-h-screen">
         <header className="sticky top-0 w-full flex justify-between items-center px-6 h-16 bg-surface-container-low/80 backdrop-blur-sm border-b border-outline-variant/20 z-30">
           <h2 className="text-sm font-medium text-on-surface truncate">
-            {selectedProject?.name ?? selectedTeam?.name ?? "TimeDesk"}
+            {activeNav === "dashboard" ? "Dashboard" : (selectedProject?.name ?? selectedTeam?.name ?? "TimeDesk")}
           </h2>
           <div className="flex items-center gap-4">
-            {selectedProject && onlineMembers.length > 0 && (
+            {activeNav !== "dashboard" && selectedProject && onlineMembers.length > 0 && (
               <span className="flex items-center gap-1.5 text-xs text-on-surface-variant">
                 <span className="w-1.5 h-1.5 rounded-full bg-primary" />
                 {onlineMembers.length} en línea
               </span>
             )}
-            {selectedTeam && <TeamMembersPanel teamId={selectedTeam.id} ownerId={selectedTeam.owner_id} />}
-            {selectedProject && (
+            {activeNav !== "dashboard" && selectedTeam && !selectedProject && (
+              <TeamMembersPanel
+                teamId={selectedTeam.id}
+                ownerId={selectedTeam.owner_id}
+                teamName={selectedTeam.name}
+                avatarUrl={selectedTeam.avatar_url}
+              />
+            )}
+            {activeNav !== "dashboard" && selectedProject && (
               <MembersPanel
                 projectId={selectedProject.id}
                 ownerId={selectedProject.owner_id}
@@ -117,39 +148,51 @@ export function AppLayout() {
         </header>
 
         <div className="p-8 flex-1 overflow-y-auto">
-          {isLoading && <p className="text-on-surface-variant text-sm">Cargando proyectos...</p>}
+          {!isLoading && !selectedTeamId && personalOnly.length === 0 ? (
+            <EmptyProjectsState />
+          ) : (
+            <>
+              {activeNav === "dashboard" && user && (
+                <DashboardView userId={user.id} onOpenProject={handleOpenProject} />
+              )}
 
-          {!isLoading && !selectedTeamId && personalOnly.length === 0 && <EmptyProjectsState />}
+              {activeNav !== "dashboard" && (
+                <>
+                  {isLoading && <p className="text-on-surface-variant text-sm">Cargando proyectos...</p>}
 
-          {!isLoading && selectedTeamId && (teamProjects ?? []).length === 0 && (
-            <p className="text-on-surface-variant text-sm">
-              Este equipo todavía no tiene proyectos. Usa el selector de arriba a la izquierda para crear uno.
-            </p>
-          )}
+                  {!isLoading && selectedTeamId && (teamProjects ?? []).length === 0 && (
+                    <p className="text-on-surface-variant text-sm">
+                      Este equipo todavía no tiene proyectos. Usa el selector de arriba a la izquierda para crear uno.
+                    </p>
+                  )}
 
-          {!isLoading && selectedTeamId && (teamProjects ?? []).length > 0 && !selectedProject && (
-            <p className="text-on-surface-variant text-sm">
-              Elige un proyecto del equipo en el selector de arriba a la izquierda.
-            </p>
-          )}
+                  {!isLoading && selectedTeamId && (teamProjects ?? []).length > 0 && !selectedProject && (
+                    <p className="text-on-surface-variant text-sm">
+                      Elige un proyecto del equipo en el selector de arriba a la izquierda.
+                    </p>
+                  )}
 
-          {!isLoading && selectedProject && activeNav === "timer" && (
-            <div className="space-y-8">
-              <TimerSection projectId={selectedProject.id} projectName={selectedProject.name} />
-              <TaskBoardArea projectId={selectedProject.id} boardOnly />
-            </div>
-          )}
+                  {!isLoading && selectedProject && activeNav === "timer" && (
+                    <div className="space-y-8">
+                      <TimerSection projectId={selectedProject.id} projectName={selectedProject.name} />
+                      <TaskBoardArea projectId={selectedProject.id} boardOnly />
+                    </div>
+                  )}
 
-          {!isLoading && selectedProject && activeNav === "tasks" && (
-            <TaskBoardArea projectId={selectedProject.id} />
-          )}
+                  {!isLoading && selectedProject && activeNav === "tasks" && (
+                    <TaskBoardArea projectId={selectedProject.id} />
+                  )}
 
-          {!isLoading && selectedProject && activeNav === "analytics" && (
-            <AnalyticsView projectId={selectedProject.id} />
-          )}
+                  {!isLoading && selectedProject && activeNav === "analytics" && (
+                    <AnalyticsView projectId={selectedProject.id} />
+                  )}
 
-          {!isLoading && selectedProject && activeNav === "settings" && (
-            <p className="text-on-surface-variant text-sm">Próximamente.</p>
+                  {!isLoading && selectedProject && activeNav === "settings" && (
+                    <ProjectSettings project={selectedProject} isOwner={user?.id === selectedProject.owner_id} />
+                  )}
+                </>
+              )}
+            </>
           )}
         </div>
       </main>

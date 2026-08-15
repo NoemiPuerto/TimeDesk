@@ -6,7 +6,7 @@ import { useCreateProject, useMyProjects } from "./hooks";
 
 export function ProjectSwitcher() {
   const { user } = useAuth();
-  const { selectedProjectId, selectProject, selectedTeamId } = useAppStore();
+  const { selectedProjectId, selectProject, selectedTeamId, setActiveNav } = useAppStore();
   const { data: personalProjects } = useMyProjects();
   const { data: teamProjects } = useTeamProjects(selectedTeamId);
   const { data: teamMembers } = useTeamMembers(selectedTeamId);
@@ -34,6 +34,7 @@ export function ProjectSwitcher() {
     if (!trimmed) return;
     const project = await createProject.mutateAsync({ name: trimmed, description, teamId: selectedTeamId });
     selectProject(project.id);
+    setActiveNav("timer");
     setName("");
     setDescription("");
     setCreating(false);

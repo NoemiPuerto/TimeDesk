@@ -1,16 +1,20 @@
 import { useState } from "react";
 import { DEFAULT_TASK_FILTERS, type TaskFilters } from "./filters";
+import { FilesView } from "./FilesView";
 import { useColumns, useTasks } from "./hooks";
 import { KanbanBoard } from "./KanbanBoard";
+import { OverviewView } from "./OverviewView";
 import { TaskListView } from "./TaskListView";
 import { TaskTimelineView } from "./TaskTimelineView";
 import { TaskDetailModal } from "./TaskDetailModal";
 import { TaskToolbar } from "./TaskToolbar";
 
 const VIEWS = [
+  { key: "overview", label: "Overview" },
   { key: "board", label: "Board" },
   { key: "list", label: "List" },
   { key: "timeline", label: "Timeline" },
+  { key: "files", label: "Files" },
 ] as const;
 
 export function TaskBoardArea({
@@ -49,10 +53,13 @@ export function TaskBoardArea({
             ))}
           </div>
 
-          <TaskToolbar columns={columns ?? []} filters={filters} onChange={setFilters} />
+          {view !== "overview" && view !== "files" && (
+            <TaskToolbar columns={columns ?? []} filters={filters} onChange={setFilters} />
+          )}
         </>
       )}
 
+      {!boardOnly && view === "overview" && <OverviewView projectId={projectId} onOpenTask={setDetailTaskId} />}
       {(boardOnly || view === "board") && (
         <KanbanBoard projectId={projectId} onOpenTask={setDetailTaskId} filters={boardOnly ? undefined : filters} />
       )}
@@ -60,6 +67,7 @@ export function TaskBoardArea({
       {!boardOnly && view === "timeline" && (
         <TaskTimelineView projectId={projectId} onOpenTask={setDetailTaskId} filters={filters} />
       )}
+      {!boardOnly && view === "files" && <FilesView projectId={projectId} onOpenTask={setDetailTaskId} />}
 
       {detailTask && (
         <TaskDetailModal task={detailTask} projectId={projectId} onClose={() => setDetailTaskId(null)} />

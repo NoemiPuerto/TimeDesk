@@ -1,10 +1,26 @@
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { CalendarIcon, CheckCircleIcon, MessageCircleIcon, PauseIcon, PlayIcon, TrashIcon } from "../../components/icons";
+import { Avatar } from "../../components/Avatar";
+import {
+  CalendarIcon,
+  CheckCircleIcon,
+  MessageCircleIcon,
+  PaperclipIcon,
+  PauseIcon,
+  PlayIcon,
+  TrashIcon,
+} from "../../components/icons";
 import { useAppStore } from "../../store/useAppStore";
 import { useActiveSession, useStartTimer, useStopTimer } from "../timer/hooks";
 import type { Task } from "./api";
-import { useCommentCounts, useDeleteTask, useSubtaskCounts, useTaskAssigneesMap, useTaskTagsMap } from "./hooks";
+import {
+  useAttachmentCounts,
+  useCommentCounts,
+  useDeleteTask,
+  useSubtaskCounts,
+  useTaskAssigneesMap,
+  useTaskTagsMap,
+} from "./hooks";
 
 const PRIORITY_STYLE: Record<string, { label: string; color: string }> = {
   high: { label: "Alta", color: "#eb3619" },
@@ -16,11 +32,13 @@ export function TaskCard({
   task,
   projectId,
   isDone,
+  dragDisabled = false,
   onOpenTask,
 }: {
   task: Task;
   projectId: string;
   isDone: boolean;
+  dragDisabled?: boolean;
   onOpenTask: (taskId: string) => void;
 }) {
   const deleteTask = useDeleteTask(projectId);
@@ -32,17 +50,20 @@ export function TaskCard({
   const { data: assigneesMap } = useTaskAssigneesMap(projectId);
   const { data: commentCounts } = useCommentCounts(projectId);
   const { data: subtaskCounts } = useSubtaskCounts(projectId);
+  const { data: attachmentCounts } = useAttachmentCounts(projectId);
 
   const isActive = activeSession?.task_id === task.id;
   const tags = tagsMap?.get(task.id) ?? [];
   const assignees = assigneesMap?.get(task.id) ?? [];
   const commentCount = commentCounts?.get(task.id) ?? 0;
   const subtasks = subtaskCounts?.get(task.id);
+  const attachmentCount = attachmentCounts?.get(task.id) ?? 0;
   const priority = task.priority ? PRIORITY_STYLE[task.priority] : null;
 
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: task.id,
     data: { type: "task", task },
+    disabled: dragDisabled,
   });
 
   const style = {
@@ -72,7 +93,9 @@ export function TaskCard({
       {...attributes}
       {...listeners}
       onClick={() => onOpenTask(task.id)}
-      className={`relative p-4 rounded-md transition-shadow group cursor-grab active:cursor-grabbing ${
+      className={`relative p-4 rounded-md transition-shadow group ${
+        dragDisabled ? "cursor-pointer" : "cursor-grab active:cursor-grabbing"
+      } ${
         isDone
           ? "bg-surface-container-lowest/60 border border-outline-variant/15 opacity-70"
           : isActive
@@ -156,17 +179,19 @@ export function TaskCard({
               {subtasks.done}/{subtasks.total}
             </span>
           )}
+          {attachmentCount > 0 && (
+            <span className="flex items-center gap-1">
+              <PaperclipIcon className="w-3 h-3" />
+              {attachmentCount}
+            </span>
+          )}
         </span>
         <div className="flex items-center gap-2 shrink-0">
           {assignees.length > 0 && (
             <div className="flex -space-x-1.5">
               {assignees.slice(0, 3).map((a) => (
-                <span
-                  key={a.id}
-                  title={a.display_name}
-                  className="w-5 h-5 rounded-full border-2 border-surface-container-lowest bg-secondary-container text-on-surface flex items-center justify-center text-[9px] font-bold"
-                >
-                  {a.display_name.slice(0, 1).toUpperCase()}
+                <span key={a.id} title={a.display_name} className="border-2 border-surface-container-lowest rounded-full">
+                  <Avatar url={a.avatar_url} name={a.display_name} size="w-5 h-5" textSize="text-[9px]" />
                 </span>
               ))}
               {assignees.length > 3 && (

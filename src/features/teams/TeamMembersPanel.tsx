@@ -1,17 +1,47 @@
 import { useState, type FormEvent } from "react";
+import { Avatar, AvatarUpload } from "../../components/Avatar";
 import { useAuth } from "../auth/AuthProvider";
-import { useInviteTeamMember, useRemoveTeamMember, useTeamMembers } from "./hooks";
+import { useAppStore } from "../../store/useAppStore";
+import {
+  useInviteTeamMember,
+  useRemoveTeamAvatar,
+  useRemoveTeamMember,
+  useTeamMembers,
+  useUploadTeamAvatar,
+} from "./hooks";
 
-export function TeamMembersPanel({ teamId, ownerId }: { teamId: string; ownerId: string }) {
+export function TeamMembersPanel({
+  teamId,
+  ownerId,
+  teamName,
+  avatarUrl,
+}: {
+  teamId: string;
+  ownerId: string;
+  teamName: string;
+  avatarUrl: string | null;
+}) {
   const { user } = useAuth();
+  const { selectTeam } = useAppStore();
   const { data: members } = useTeamMembers(teamId);
   const inviteMember = useInviteTeamMember(teamId);
   const removeMember = useRemoveTeamMember(teamId);
+  const uploadTeamAvatar = useUploadTeamAvatar(teamId);
+  const removeTeamAvatar = useRemoveTeamAvatar(teamId);
   const [open, setOpen] = useState(false);
   const [email, setEmail] = useState("");
   const [error, setError] = useState<string | null>(null);
 
   const isAdmin = members?.some((m) => m.user_id === user?.id && m.role === "admin") ?? false;
+  const isOwner = user?.id === ownerId;
+
+  function handleLeave() {
+    if (!user) return;
+    if (!confirm("¿Salir de este equipo? Perderás acceso a sus proyectos compartidos.")) return;
+    removeMember.mutate(user.id);
+    selectTeam(null);
+    setOpen(false);
+  }
 
   async function handleInvite(e: FormEvent) {
     e.preventDefault();
@@ -36,9 +66,9 @@ export function TeamMembersPanel({ teamId, ownerId }: { teamId: string; ownerId:
           <div
             key={m.user_id}
             title={`${m.profile.display_name}${m.role === "admin" ? " (admin)" : ""}`}
-            className="w-8 h-8 rounded-full border-2 border-surface bg-secondary-container text-on-surface flex items-center justify-center text-xs font-bold"
+            className="border-2 border-surface rounded-full"
           >
-            {m.profile.display_name.slice(0, 1).toUpperCase()}
+            <Avatar url={m.profile.avatar_url} name={m.profile.display_name} size="w-8 h-8" />
           </div>
         ))}
         <div className="w-8 h-8 rounded-full border-2 border-surface bg-surface-container-high text-on-surface-variant flex items-center justify-center text-xs">
@@ -48,10 +78,26 @@ export function TeamMembersPanel({ teamId, ownerId }: { teamId: string; ownerId:
 
       {open && (
         <div className="absolute right-0 mt-2 w-72 bg-surface-container-lowest border border-outline-variant/30 rounded-md shadow-lg z-50 p-3 flex flex-col gap-3">
+          <div className="flex items-center gap-3 pb-2 border-b border-outline-variant/20">
+            {isOwner ? (
+              <AvatarUpload
+                url={avatarUrl}
+                name={teamName}
+                size="w-11 h-11"
+                onUpload={(file) => uploadTeamAvatar.mutateAsync(file)}
+                onRemove={avatarUrl ? () => removeTeamAvatar.mutate() : undefined}
+              />
+            ) : (
+              <Avatar url={avatarUrl} name={teamName} size="w-11 h-11" textSize="text-sm" />
+            )}
+            <p className="text-sm font-bold text-on-surface truncate">{teamName}</p>
+          </div>
+
           <ul className="flex flex-col gap-2">
             {members?.map((m) => (
-              <li key={m.user_id} className="flex items-center justify-between gap-2 text-sm">
-                <div className="min-w-0">
+              <li key={m.user_id} className="flex items-center gap-2 text-sm">
+                <Avatar url={m.profile.avatar_url} name={m.profile.display_name} size="w-7 h-7" textSize="text-[10px]" />
+                <div className="min-w-0 flex-1">
                   <p className="text-on-surface truncate">
                     {m.profile.display_name}
                     {m.role === "admin" && <span className="text-on-surface-variant text-xs"> · admin</span>}
@@ -90,6 +136,16 @@ export function TeamMembersPanel({ teamId, ownerId }: { teamId: string; ownerId:
                 Invitar
               </button>
             </form>
+          )}
+
+          {!isOwner && (
+            <button
+              type="button"
+              onClick={handleLeave}
+              className="text-xs text-error text-left pt-2 border-t border-outline-variant/20"
+            >
+              Salir del equipo
+            </button>
           )}
         </div>
       )}

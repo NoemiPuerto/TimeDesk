@@ -4,6 +4,7 @@ export type Team = {
   id: string;
   name: string;
   owner_id: string;
+  avatar_url: string | null;
   created_at: string;
 };
 
@@ -12,7 +13,7 @@ export type TeamMember = {
   user_id: string;
   role: "admin" | "member";
   joined_at: string;
-  profile: { display_name: string; email: string };
+  profile: { display_name: string; email: string; avatar_url: string | null };
 };
 
 export type TeamProject = {
@@ -28,7 +29,7 @@ export type TeamProject = {
 export async function listMyTeams(): Promise<Team[]> {
   const { data, error } = await supabase
     .from("teams")
-    .select("id, name, owner_id, created_at")
+    .select("id, name, owner_id, avatar_url, created_at")
     .order("created_at", { ascending: true });
   if (error) throw error;
   return data;
@@ -44,7 +45,7 @@ export async function createTeam(name: string): Promise<Team> {
 export async function listTeamMembers(teamId: string): Promise<TeamMember[]> {
   const { data, error } = await supabase
     .from("team_members")
-    .select("team_id, user_id, role, joined_at, profile:profiles(display_name, email)")
+    .select("team_id, user_id, role, joined_at, profile:profiles(display_name, email, avatar_url)")
     .eq("team_id", teamId);
   if (error) throw error;
   return data as unknown as TeamMember[];

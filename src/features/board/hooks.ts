@@ -4,6 +4,7 @@ import * as tagsApi from "./tags";
 import * as assigneesApi from "./assignees";
 import * as commentsApi from "./comments";
 import * as subtasksApi from "./subtasks";
+import * as attachmentsApi from "./attachments";
 
 export function useColumns(projectId: string | null) {
   return useQuery({
@@ -45,6 +46,30 @@ export function useDeleteColumn(projectId: string | null) {
       queryClient.invalidateQueries({ queryKey: ["columns", projectId] });
       queryClient.invalidateQueries({ queryKey: ["tasks", projectId] });
     },
+  });
+}
+
+export function useReorderColumns(projectId: string | null) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (updates: { id: string; position: number }[]) => api.reorderColumns(updates),
+    onMutate: async (updates) => {
+      await queryClient.cancelQueries({ queryKey: ["columns", projectId] });
+      const previous = queryClient.getQueryData<api.Column[]>(["columns", projectId]);
+      queryClient.setQueryData<api.Column[]>(["columns", projectId], (old) => {
+        if (!old) return old;
+        const next = old.map((c) => {
+          const update = updates.find((u) => u.id === c.id);
+          return update ? { ...c, position: update.position } : c;
+        });
+        return next.sort((a, b) => a.position - b.position);
+      });
+      return { previous };
+    },
+    onError: (_err, _vars, context) => {
+      if (context?.previous) queryClient.setQueryData(["columns", projectId], context.previous);
+    },
+    onSettled: () => queryClient.invalidateQueries({ queryKey: ["columns", projectId] }),
   });
 }
 
@@ -274,5 +299,58 @@ export function useDeleteSubtask(taskId: string | null, projectId: string | null
   return useMutation({
     mutationFn: (subtaskId: string) => subtasksApi.deleteSubtask(subtaskId),
     onSuccess: () => invalidateSubtaskQueries(queryClient, taskId, projectId),
+  });
+}
+
+// ── Attachments ──────────────────────────────────────────────────────────
+
+export function useTaskAttachments(taskId: string | null) {
+  return useQuery({
+    queryKey: ["attachments", taskId],
+    queryFn: () => attachmentsApi.listTaskAttachments(taskId as string),
+    enabled: !!taskId,
+  });
+}
+
+export function useProjectAttachments(projectId: string | null) {
+  return useQuery({
+    queryKey: ["project-attachments", projectId],
+    queryFn: () => attachmentsApi.listProjectAttachments(projectId as string),
+    enabled: !!projectId,
+  });
+}
+
+export function useAttachmentCounts(projectId: string | null) {
+  return useQuery({
+    queryKey: ["attachment-counts", projectId],
+    queryFn: () => attachmentsApi.listAttachmentCounts(projectId as string),
+    enabled: !!projectId,
+  });
+}
+
+function invalidateAttachmentQueries(
+  queryClient: ReturnType<typeof useQueryClient>,
+  taskId: string | null,
+  projectId: string | null,
+) {
+  queryClient.invalidateQueries({ queryKey: ["attachments", taskId] });
+  queryClient.invalidateQueries({ queryKey: ["project-attachments", projectId] });
+  queryClient.invalidateQueries({ queryKey: ["attachment-counts", projectId] });
+}
+
+export function useUploadAttachment(taskId: string | null, projectId: string | null) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (file: File) => attachmentsApi.uploadAttachment(projectId as string, taskId as string, file),
+    onSuccess: () => invalidateAttachmentQueries(queryClient, taskId, projectId),
+  });
+}
+
+export function useDeleteAttachment(taskId: string | null, projectId: string | null) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ attachmentId, storagePath }: { attachmentId: string; storagePath: string }) =>
+      attachmentsApi.deleteAttachment(attachmentId, storagePath),
+    onSuccess: () => invalidateAttachmentQueries(queryClient, taskId, projectId),
   });
 }

@@ -1,4 +1,6 @@
 import { useMemo } from "react";
+import { Avatar } from "../../components/Avatar";
+import { MessageCircleIcon } from "../../components/icons";
 import type { Task } from "./api";
 import { applyTaskFilters, DEFAULT_TASK_FILTERS, type TaskFilters } from "./filters";
 import { useColumns, useCommentCounts, useTaskAssigneesMap, useTaskTagsMap, useTasks } from "./hooks";
@@ -95,17 +97,16 @@ export function TaskListView({
                         <span className="text-[11px] text-on-surface-variant shrink-0">{dueDateLabel}</span>
                       )}
                       {commentCount > 0 && (
-                        <span className="text-[11px] text-on-surface-variant shrink-0">💬 {commentCount}</span>
+                        <span className="flex items-center gap-1 text-[11px] text-on-surface-variant shrink-0">
+                          <MessageCircleIcon className="w-3 h-3" />
+                          {commentCount}
+                        </span>
                       )}
                       {assignees.length > 0 && (
                         <div className="flex -space-x-1.5 shrink-0">
                           {assignees.slice(0, 3).map((a) => (
-                            <span
-                              key={a.id}
-                              title={a.display_name}
-                              className="w-5 h-5 rounded-full border-2 border-surface-container-lowest bg-secondary-container text-on-surface flex items-center justify-center text-[9px] font-bold"
-                            >
-                              {a.display_name.slice(0, 1).toUpperCase()}
+                            <span key={a.id} title={a.display_name} className="border-2 border-surface-container-lowest rounded-full">
+                              <Avatar url={a.avatar_url} name={a.display_name} size="w-5 h-5" textSize="text-[9px]" />
                             </span>
                           ))}
                         </div>

@@ -65,3 +65,16 @@ export async function removeMember(projectId: string, userId: string): Promise<v
     .eq("user_id", userId);
   if (error) throw error;
 }
+
+export async function updateProject(
+  projectId: string,
+  details: { name?: string; description?: string | null },
+): Promise<void> {
+  const { error } = await supabase.from("projects").update(details).eq("id", projectId);
+  if (error) throw error;
+}
+
+export async function deleteProject(projectId: string): Promise<void> {
+  const { error } = await supabase.from("projects").delete().eq("id", projectId);
+  if (error) throw error;
+}
