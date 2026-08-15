@@ -8,13 +8,24 @@ export type Column = {
   position: number;
 };
 
+export type Priority = "low" | "medium" | "high";
+
 export type Task = {
   id: string;
   project_id: string;
   column_id: string;
   title: string;
+  description: string | null;
+  priority: Priority | null;
+  due_date: string | null;
   position: number;
   created_at: string;
+};
+
+export type TaskDetails = {
+  description: string | null;
+  priority: Priority | null;
+  due_date: string | null;
 };
 
 export async function listColumns(projectId: string): Promise<Column[]> {
@@ -48,11 +59,11 @@ export async function deleteColumn(columnId: string): Promise<void> {
 export async function listTasks(projectId: string): Promise<Task[]> {
   const { data, error } = await supabase
     .from("tasks")
-    .select("id, project_id, column_id, title, position, created_at")
+    .select("id, project_id, column_id, title, description, priority, due_date, position, created_at")
     .eq("project_id", projectId)
     .order("position", { ascending: true });
   if (error) throw error;
-  return data;
+  return data as Task[];
 }
 
 export async function createTask(projectId: string, columnId: string, title: string): Promise<Task> {
@@ -64,11 +75,16 @@ export async function createTask(projectId: string, columnId: string, title: str
     p_title: title,
   });
   if (error) throw error;
-  return data;
+  return data as Task;
 }
 
 export async function renameTask(taskId: string, title: string): Promise<void> {
   const { error } = await supabase.from("tasks").update({ title }).eq("id", taskId);
+  if (error) throw error;
+}
+
+export async function updateTaskDetails(taskId: string, details: Partial<TaskDetails>): Promise<void> {
+  const { error } = await supabase.from("tasks").update(details).eq("id", taskId);
   if (error) throw error;
 }
 

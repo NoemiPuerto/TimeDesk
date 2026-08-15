@@ -4,6 +4,7 @@ import { useMemo, useState, type FormEvent } from "react";
 import type { Task } from "./api";
 import { useColumns, useCreateColumn, useReorderTasks, useTasks } from "./hooks";
 import { Column } from "./Column";
+import { TaskDetailModal } from "./TaskDetailModal";
 
 export function KanbanBoard({ projectId }: { projectId: string }) {
   const { data: columns, isLoading: columnsLoading } = useColumns(projectId);
@@ -11,6 +12,7 @@ export function KanbanBoard({ projectId }: { projectId: string }) {
   const createColumn = useCreateColumn(projectId);
   const reorderTasks = useReorderTasks(projectId);
   const [newColumnName, setNewColumnName] = useState("");
+  const [detailTaskId, setDetailTaskId] = useState<string | null>(null);
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 4 } }));
 
@@ -82,11 +84,19 @@ export function KanbanBoard({ projectId }: { projectId: string }) {
     return <p className="text-on-surface-variant text-sm p-8">Cargando tablero...</p>;
   }
 
+  const detailTask = tasks?.find((t) => t.id === detailTaskId) ?? null;
+
   return (
     <DndContext sensors={sensors} collisionDetection={closestCorners} onDragEnd={handleDragEnd}>
       <div className="flex items-start gap-6 overflow-x-auto pb-4">
         {(columns ?? []).map((column) => (
-          <Column key={column.id} column={column} tasks={tasksByColumn.get(column.id) ?? []} projectId={projectId} />
+          <Column
+            key={column.id}
+            column={column}
+            tasks={tasksByColumn.get(column.id) ?? []}
+            projectId={projectId}
+            onOpenTask={setDetailTaskId}
+          />
         ))}
 
         {addingColumn ? (
@@ -118,6 +128,10 @@ export function KanbanBoard({ projectId }: { projectId: string }) {
           </button>
         )}
       </div>
+
+      {detailTask && (
+        <TaskDetailModal task={detailTask} projectId={projectId} onClose={() => setDetailTaskId(null)} />
+      )}
     </DndContext>
   );
 }

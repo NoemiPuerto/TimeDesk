@@ -9,10 +9,12 @@ export function Column({
   column,
   tasks,
   projectId,
+  onOpenTask,
 }: {
   column: ColumnType;
   tasks: Task[];
   projectId: string;
+  onOpenTask: (taskId: string) => void;
 }) {
   const [editingName, setEditingName] = useState(false);
   const [name, setName] = useState(column.name);
@@ -85,7 +87,7 @@ export function Column({
       >
         <SortableContext items={tasks.map((t) => t.id)} strategy={verticalListSortingStrategy}>
           {tasks.map((task) => (
-            <TaskCard key={task.id} task={task} projectId={projectId} />
+            <TaskCard key={task.id} task={task} projectId={projectId} onOpenTask={onOpenTask} />
           ))}
         </SortableContext>
       </div>

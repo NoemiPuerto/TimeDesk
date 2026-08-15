@@ -1,5 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import * as api from "./api";
+import * as tagsApi from "./tags";
+import * as assigneesApi from "./assignees";
 
 export function useColumns(projectId: string | null) {
   return useQuery({
@@ -88,5 +90,95 @@ export function useDeleteTask(projectId: string | null) {
   return useMutation({
     mutationFn: (taskId: string) => api.deleteTask(taskId),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["tasks", projectId] }),
+  });
+}
+
+export function useUpdateTaskDetails(projectId: string | null) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ taskId, details }: { taskId: string; details: Partial<api.TaskDetails> }) =>
+      api.updateTaskDetails(taskId, details),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["tasks", projectId] }),
+  });
+}
+
+// ── Tags ─────────────────────────────────────────────────────────────────
+
+export function useProjectTags(projectId: string | null) {
+  return useQuery({
+    queryKey: ["tags", projectId],
+    queryFn: () => tagsApi.listProjectTags(projectId as string),
+    enabled: !!projectId,
+  });
+}
+
+export function useTaskTagsMap(projectId: string | null) {
+  return useQuery({
+    queryKey: ["task-tags", projectId],
+    queryFn: () => tagsApi.listAllTaskTags(projectId as string),
+    enabled: !!projectId,
+  });
+}
+
+export function useCreateTag(projectId: string | null) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (name: string) => tagsApi.createTag(projectId as string, name),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["tags", projectId] }),
+  });
+}
+
+export function useDeleteTag(projectId: string | null) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (tagId: string) => tagsApi.deleteTag(tagId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["tags", projectId] });
+      queryClient.invalidateQueries({ queryKey: ["task-tags", projectId] });
+    },
+  });
+}
+
+export function useAddTaskTag(projectId: string | null) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ taskId, tagId }: { taskId: string; tagId: string }) => tagsApi.addTaskTag(taskId, tagId),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["task-tags", projectId] }),
+  });
+}
+
+export function useRemoveTaskTag(projectId: string | null) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ taskId, tagId }: { taskId: string; tagId: string }) => tagsApi.removeTaskTag(taskId, tagId),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["task-tags", projectId] }),
+  });
+}
+
+// ── Assignees ────────────────────────────────────────────────────────────
+
+export function useTaskAssigneesMap(projectId: string | null) {
+  return useQuery({
+    queryKey: ["task-assignees", projectId],
+    queryFn: () => assigneesApi.listAllTaskAssignees(projectId as string),
+    enabled: !!projectId,
+  });
+}
+
+export function useAddTaskAssignee(projectId: string | null) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ taskId, userId }: { taskId: string; userId: string }) =>
+      assigneesApi.addTaskAssignee(taskId, userId),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["task-assignees", projectId] }),
+  });
+}
+
+export function useRemoveTaskAssignee(projectId: string | null) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ taskId, userId }: { taskId: string; userId: string }) =>
+      assigneesApi.removeTaskAssignee(taskId, userId),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["task-assignees", projectId] }),
   });
 }

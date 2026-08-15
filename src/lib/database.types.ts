@@ -202,51 +202,142 @@ export type Database = {
           },
         ]
       }
+      tags: {
+        Row: {
+          color: string
+          created_at: string
+          id: string
+          name: string
+          project_id: string
+        }
+        Insert: {
+          color: string
+          created_at?: string
+          id?: string
+          name: string
+          project_id: string
+        }
+        Update: {
+          color?: string
+          created_at?: string
+          id?: string
+          name?: string
+          project_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tags_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      task_assignees: {
+        Row: {
+          assigned_at: string
+          task_id: string
+          user_id: string
+        }
+        Insert: {
+          assigned_at?: string
+          task_id: string
+          user_id: string
+        }
+        Update: {
+          assigned_at?: string
+          task_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "task_assignees_task_id_fkey"
+            columns: ["task_id"]
+            isOneToOne: false
+            referencedRelation: "tasks"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "task_assignees_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      task_tags: {
+        Row: {
+          tag_id: string
+          task_id: string
+        }
+        Insert: {
+          tag_id: string
+          task_id: string
+        }
+        Update: {
+          tag_id?: string
+          task_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "task_tags_tag_id_fkey"
+            columns: ["tag_id"]
+            isOneToOne: false
+            referencedRelation: "tags"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "task_tags_task_id_fkey"
+            columns: ["task_id"]
+            isOneToOne: false
+            referencedRelation: "tasks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       tasks: {
         Row: {
-          assigned_to: string | null
           column_id: string
           created_at: string
           created_by: string
           description: string | null
+          due_date: string | null
           id: string
           position: number
+          priority: string | null
           project_id: string
           title: string
           updated_at: string
         }
         Insert: {
-          assigned_to?: string | null
           column_id: string
           created_at?: string
           created_by: string
           description?: string | null
+          due_date?: string | null
           id?: string
           position?: number
+          priority?: string | null
           project_id: string
           title: string
           updated_at?: string
         }
         Update: {
-          assigned_to?: string | null
           column_id?: string
           created_at?: string
           created_by?: string
           description?: string | null
+          due_date?: string | null
           id?: string
           position?: number
+          priority?: string | null
           project_id?: string
           title?: string
           updated_at?: string
         }
         Relationships: [
-          {
-            foreignKeyName: "tasks_assigned_to_fkey"
-            columns: ["assigned_to"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
           {
             foreignKeyName: "tasks_column_id_fkey"
             columns: ["column_id"]
@@ -324,6 +415,14 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      add_task_assignee: {
+        Args: { p_task_id: string; p_user_id: string }
+        Returns: undefined
+      }
+      add_task_tag: {
+        Args: { p_tag_id: string; p_task_id: string }
+        Returns: undefined
+      }
       create_column: {
         Args: { p_name: string; p_project_id: string }
         Returns: {
@@ -358,16 +457,33 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      create_tag: {
+        Args: { p_name: string; p_project_id: string }
+        Returns: {
+          color: string
+          created_at: string
+          id: string
+          name: string
+          project_id: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "tags"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       create_task: {
         Args: { p_column_id: string; p_project_id: string; p_title: string }
         Returns: {
-          assigned_to: string | null
           column_id: string
           created_at: string
           created_by: string
           description: string | null
+          due_date: string | null
           id: string
           position: number
+          priority: string | null
           project_id: string
           title: string
           updated_at: string
