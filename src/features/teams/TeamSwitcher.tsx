@@ -1,5 +1,6 @@
 import { useState, type FormEvent } from "react";
 import { Avatar } from "../../components/Avatar";
+import { useDismissable } from "../../lib/useDismissable";
 import { useAppStore } from "../../store/useAppStore";
 import { useCreateTeam, useMyTeams } from "./hooks";
 
@@ -10,6 +11,12 @@ export function TeamSwitcher() {
   const [open, setOpen] = useState(false);
   const [creating, setCreating] = useState(false);
   const [name, setName] = useState("");
+
+  function close() {
+    setOpen(false);
+    setCreating(false);
+  }
+  const containerRef = useDismissable(open, close);
 
   const selected = teams?.find((t) => t.id === selectedTeamId);
 
@@ -25,7 +32,7 @@ export function TeamSwitcher() {
   }
 
   return (
-    <div className="relative px-2 mt-4">
+    <div className="relative px-2 mt-4" ref={containerRef}>
       <button
         type="button"
         aria-label="Selector de equipo"

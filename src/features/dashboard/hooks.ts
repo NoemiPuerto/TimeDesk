@@ -32,11 +32,3 @@ export function useDashboardSessions(projectIds: string[], since: string) {
     enabled: projectIds.length > 0,
   });
 }
-
-export function useDashboardComments(projectIds: string[]) {
-  return useQuery({
-    queryKey: ["dashboard-comments", projectIds],
-    queryFn: () => api.listRecentCommentsForProjects(projectIds),
-    enabled: projectIds.length > 0,
-  });
-}

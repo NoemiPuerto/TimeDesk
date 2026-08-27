@@ -1,6 +1,7 @@
 import { DndContext, closestCorners, PointerSensor, useSensor, useSensors, type DragEndEvent } from "@dnd-kit/core";
 import { arrayMove, horizontalListSortingStrategy, SortableContext } from "@dnd-kit/sortable";
 import { useMemo, useState, type FormEvent } from "react";
+import { startOfWeek } from "../analytics/utils";
 import type { Task } from "./api";
 import { applyTaskFilters, DEFAULT_TASK_FILTERS, hasActiveFilters, type TaskFilters } from "./filters";
 import { useColumns, useCreateColumn, useReorderColumns, useReorderTasks, useTasks } from "./hooks";
@@ -11,10 +12,18 @@ export function KanbanBoard({
   projectId,
   onOpenTask,
   filters = DEFAULT_TASK_FILTERS,
+  doneDisplayLimit = null,
+  recentOnly = false,
+  onShowHistory,
 }: {
   projectId: string;
   onOpenTask: (taskId: string) => void;
   filters?: TaskFilters;
+  /** Tarjetas visibles en la columna de terminadas. null = todas. */
+  doneDisplayLimit?: number | null;
+  /** Vista del Timer: esconde lo terminado antes de esta semana. */
+  recentOnly?: boolean;
+  onShowHistory?: () => void;
 }) {
   const { data: columns, isLoading: columnsLoading } = useColumns(projectId);
   const { data: tasks, isLoading: tasksLoading } = useTasks(projectId);
@@ -27,9 +36,18 @@ export function KanbanBoard({
 
   const filteredTasks = useMemo(() => applyTaskFilters(tasks ?? [], filters), [tasks, filters]);
 
+  // En el Timer el tablero es "lo que estoy haciendo ahora": las terminadas de
+  // semanas anteriores solo estorban. Las abiertas se muestran siempre, sin
+  // importar cuándo se crearon.
+  const visibleTasks = useMemo(() => {
+    if (!recentOnly) return filteredTasks;
+    const weekStart = startOfWeek(new Date()).getTime();
+    return filteredTasks.filter((t) => !t.completed_at || new Date(t.completed_at).getTime() >= weekStart);
+  }, [filteredTasks, recentOnly]);
+
   const tasksByColumn = useMemo(() => {
     const map = new Map<string, Task[]>();
-    for (const task of filteredTasks) {
+    for (const task of visibleTasks) {
       const list = map.get(task.column_id) ?? [];
       list.push(task);
       map.set(task.column_id, list);
@@ -38,7 +56,7 @@ export function KanbanBoard({
       for (const list of map.values()) list.sort((a, b) => a.position - b.position);
     }
     return map;
-  }, [filteredTasks, filters.sortBy]);
+  }, [visibleTasks, filters.sortBy]);
 
   function handleColumnDragEnd(activeColId: string, overColId: string) {
     if (!columns || activeColId === overColId) return;
@@ -136,6 +154,22 @@ export function KanbanBoard({
   const lastColumnId = columns && columns.length > 0 ? columns[columns.length - 1].id : null;
   const tasksDragDisabled = hasActiveFilters(filters);
 
+  // El recorte es solo de pintura: `tasksByColumn` sigue completo porque es lo
+  // que usa handleDragEnd para calcular posiciones al soltar.
+  const doneTasksAll = lastColumnId ? (tasksByColumn.get(lastColumnId) ?? []) : [];
+  // Las que escondió el filtro "solo esta semana" también cuentan para el pie
+  // de la columna: si no, diría que hay menos terminadas de las que hay.
+  const doneHiddenByWeek = lastColumnId
+    ? filteredTasks.filter((t) => t.column_id === lastColumnId).length - doneTasksAll.length
+    : 0;
+  const doneTasksVisible =
+    doneDisplayLimit && doneTasksAll.length > doneDisplayLimit
+      ? [...doneTasksAll]
+          .sort((a, b) => (b.completed_at ?? "").localeCompare(a.completed_at ?? ""))
+          .slice(0, doneDisplayLimit)
+      : doneTasksAll;
+  const doneHiddenCount = doneTasksAll.length - doneTasksVisible.length + doneHiddenByWeek;
+
   return (
     <div className="flex flex-col gap-4">
       <QuickAddTask projectId={projectId} columns={columns ?? []} />
@@ -149,17 +183,22 @@ export function KanbanBoard({
       <DndContext sensors={sensors} collisionDetection={closestCorners} onDragEnd={handleDragEnd}>
         <div className="flex items-start gap-6 overflow-x-auto pb-4">
           <SortableContext items={(columns ?? []).map((c) => `col-${c.id}`)} strategy={horizontalListSortingStrategy}>
-            {(columns ?? []).map((column) => (
-              <Column
-                key={column.id}
-                column={column}
-                tasks={tasksByColumn.get(column.id) ?? []}
-                projectId={projectId}
-                isDoneColumn={column.id === lastColumnId}
-                tasksDragDisabled={tasksDragDisabled}
-                onOpenTask={onOpenTask}
-              />
-            ))}
+            {(columns ?? []).map((column) => {
+              const isDone = column.id === lastColumnId;
+              return (
+                <Column
+                  key={column.id}
+                  column={column}
+                  tasks={isDone ? doneTasksVisible : (tasksByColumn.get(column.id) ?? [])}
+                  projectId={projectId}
+                  isDoneColumn={isDone}
+                  tasksDragDisabled={tasksDragDisabled}
+                  hiddenCount={isDone ? doneHiddenCount : 0}
+                  onShowHistory={onShowHistory}
+                  onOpenTask={onOpenTask}
+                />
+              );
+            })}
           </SortableContext>
 
           {addingColumn ? (

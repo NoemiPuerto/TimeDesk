@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent, type KeyboardEvent } from "react";
+import { useState, type FormEvent, type KeyboardEvent } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { PlusIcon, SlidersIcon } from "../../components/icons";
 import type { Column, Priority } from "./api";
@@ -14,7 +14,7 @@ const PRIORITIES: { value: Priority; label: string; color: string }[] = [
 
 export function QuickAddTask({ projectId, columns }: { projectId: string; columns: Column[] }) {
   const [title, setTitle] = useState("");
-  const [columnId, setColumnId] = useState(columns[0]?.id ?? "");
+  const [columnId, setColumnId] = useState("");
   const [expanded, setExpanded] = useState(false);
   const [priority, setPriority] = useState<Priority | null>(null);
   const [dueDate, setDueDate] = useState<string | null>(null);
@@ -25,11 +25,14 @@ export function QuickAddTask({ projectId, columns }: { projectId: string; column
   const updateDetails = useUpdateTaskDetails(projectId);
   const queryClient = useQueryClient();
 
-  useEffect(() => {
-    if (!columnId && columns.length > 0) setColumnId(columns[0].id);
-  }, [columns, columnId]);
-
-  const selectedColumn = columns.find((c) => c.id === columnId);
+  // La columna destino se DERIVA, no se guarda a secas: al cambiar de proyecto
+  // este componente no se desmonta, así que un `columnId` guardado seguiría
+  // apuntando a una columna del proyecto anterior. El trigger
+  // `tasks_set_project_id` saca el project_id de la COLUMNA, así que crear con
+  // esa columna vieja metía la tarea (y después su tiempo) en el proyecto
+  // anterior sin ningún error visible.
+  const selectedColumn = columns.find((c) => c.id === columnId) ?? columns[0];
+  const effectiveColumnId = selectedColumn?.id ?? "";
 
   function addSubtaskDraft() {
     const value = subtaskInput.trim();
@@ -52,9 +55,9 @@ export function QuickAddTask({ projectId, columns }: { projectId: string; column
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     const trimmedTitle = title.trim();
-    if (!trimmedTitle || !columnId) return;
+    if (!trimmedTitle || !effectiveColumnId) return;
 
-    const task = await createTask.mutateAsync({ columnId, title: trimmedTitle });
+    const task = await createTask.mutateAsync({ columnId: effectiveColumnId, title: trimmedTitle });
 
     if (priority || dueDate) {
       await updateDetails.mutateAsync({ taskId: task.id, details: { priority, due_date: dueDate } });
@@ -88,7 +91,7 @@ export function QuickAddTask({ projectId, columns }: { projectId: string; column
           onChange={(e) => setTitle(e.target.value)}
         />
         <select
-          value={columnId}
+          value={effectiveColumnId}
           onChange={(e) => setColumnId(e.target.value)}
           aria-label="Columna destino"
           className="bg-surface-container-low border border-outline-variant/30 rounded-sm px-2 py-1.5 text-xs text-on-surface-variant focus:outline-none focus:ring-2 focus:ring-primary-container shrink-0"

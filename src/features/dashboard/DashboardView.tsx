@@ -1,15 +1,10 @@
 import { useMemo } from "react";
 import { Avatar } from "../../components/Avatar";
 import { AtSignIcon, KanbanIcon } from "../../components/icons";
-import { totalHours } from "../analytics/utils";
-import { useMyProfile } from "../profile/hooks";
-import {
-  useAccessibleProjects,
-  useDashboardColumns,
-  useDashboardComments,
-  useDashboardSessions,
-  useDashboardTasks,
-} from "./hooks";
+import { useAppStore } from "../../store/useAppStore";
+import { startOfWeek, summarize } from "../analytics/utils";
+import { useNotifications } from "../notifications/hooks";
+import { useAccessibleProjects, useDashboardColumns, useDashboardSessions, useDashboardTasks } from "./hooks";
 
 const PRIORITY_STYLE: Record<string, { label: string; color: string }> = {
   high: { label: "Alta", color: "#eb3619" },
@@ -33,19 +28,19 @@ export function DashboardView({
   userId: string;
   onOpenProject: (project: { id: string; team_id: string | null }) => void;
 }) {
-  const { data: myProfile } = useMyProfile(userId);
+  const { requestOpenTask } = useAppStore();
   const { data: projects, isLoading: projectsLoading } = useAccessibleProjects(userId);
   const projectIds = useMemo(() => (projects ?? []).map((p) => p.id), [projects]);
 
   const { data: tasks } = useDashboardTasks(projectIds);
   const { data: columns } = useDashboardColumns(projectIds);
-  const since = useMemo(() => {
-    const d = new Date();
-    d.setDate(d.getDate() - 7);
-    return d.toISOString();
-  }, []);
+  // Semana de calendario (lunes), no "últimos 7 días": la tarjeta dice "esta
+  // semana" y tiene que coincidir con lo que muestra Analytics.
+  const since = useMemo(() => startOfWeek(new Date()).toISOString(), []);
   const { data: sessions } = useDashboardSessions(projectIds, since);
-  const { data: comments } = useDashboardComments(projectIds);
+  // Las menciones las resuelve un trigger al guardar el comentario, no un
+  // escaneo de texto en el cliente — ver la migración de notificaciones.
+  const { data: notifications } = useNotifications(userId);
 
   const now = Date.now();
   const todayKey = new Date().toISOString().slice(0, 10);
@@ -75,7 +70,7 @@ export function DashboardView({
   const totalTasks = tasks?.length ?? 0;
   const doneTasks = (tasks ?? []).filter(isDone).length;
   const completionRate = totalTasks > 0 ? (doneTasks / totalTasks) * 100 : 0;
-  const weekHours = sessions ? totalHours(sessions, now) : 0;
+  const weekHours = sessions ? summarize(sessions, now).thisWeek : 0;
 
   const overdueTasks = useMemo(
     () => (tasks ?? []).filter((t) => t.due_date && t.due_date < todayKey && !isDone(t)),
@@ -104,13 +99,14 @@ export function DashboardView({
     [projects, tasks, lastColumnByProject],
   );
 
-  const mentions = useMemo(() => {
-    const myName = myProfile?.display_name?.trim().toLowerCase();
-    if (!myName) return [];
-    return (comments ?? [])
-      .filter((c) => c.user_id !== userId && c.body.toLowerCase().includes(`@${myName}`))
-      .slice(0, 5);
-  }, [comments, myProfile, userId]);
+  const mentions = useMemo(() => (notifications ?? []).slice(0, 5), [notifications]);
+
+  function openMention(projectId: string | null, taskId: string | null) {
+    const project = projectId ? projectsById.get(projectId) : undefined;
+    if (!project) return;
+    requestOpenTask(taskId);
+    onOpenProject(project);
+  }
 
   if (projectsLoading) {
     return <p className="text-on-surface-variant text-sm">Cargando dashboard...</p>;
@@ -192,23 +188,27 @@ export function DashboardView({
               </p>
             ) : (
               <div className="flex flex-col gap-2">
-                {mentions.map((c) => (
+                {mentions.map((n) => (
                   <button
-                    key={c.id}
+                    key={n.id}
                     type="button"
-                    onClick={() => {
-                      const project = projectsById.get(c.project_id);
-                      if (project) onOpenProject(project);
-                    }}
+                    onClick={() => openMention(n.project_id, n.task_id)}
                     className="flex items-start gap-2 bg-surface-container rounded-lg p-3 text-left hover:bg-surface-container-high transition-colors"
                   >
-                    <Avatar url={c.author.avatar_url} name={c.author.display_name} size="w-6 h-6" textSize="text-[10px]" />
+                    <Avatar
+                      url={n.actor?.avatar_url}
+                      name={n.actor?.display_name ?? "?"}
+                      size="w-6 h-6"
+                      textSize="text-[10px]"
+                    />
                     <span className="min-w-0 flex-1">
-                      <span className="block text-xs font-bold text-on-surface">{c.author.display_name}</span>
-                      <span className="block text-xs text-on-surface-variant truncate">
-                        en "{c.task?.title ?? "tarea eliminada"}"
+                      <span className="block text-xs font-bold text-on-surface">
+                        {n.actor?.display_name ?? "Alguien"}
                       </span>
-                      <span className="block text-xs text-on-surface line-clamp-2 mt-0.5">{c.body}</span>
+                      <span className="block text-xs text-on-surface-variant truncate">
+                        en "{n.task_title ?? "tarea eliminada"}"
+                      </span>
+                      <span className="block text-xs text-on-surface line-clamp-2 mt-0.5">{n.body}</span>
                     </span>
                   </button>
                 ))}

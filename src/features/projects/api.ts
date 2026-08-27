@@ -7,6 +7,8 @@ export type Project = {
   owner_id: string;
   team_id: string | null;
   created_at: string;
+  /** Tarjetas visibles en la columna Done del tablero. null = sin límite. */
+  done_display_limit: number | null;
 };
 
 export type ProjectMember = {
@@ -20,7 +22,7 @@ export type ProjectMember = {
 export async function listMyProjects(): Promise<Project[]> {
   const { data, error } = await supabase
     .from("projects")
-    .select("id, name, description, owner_id, team_id, created_at")
+    .select("id, name, description, owner_id, team_id, created_at, done_display_limit")
     .order("created_at", { ascending: true });
   if (error) throw error;
   return data;
@@ -68,7 +70,7 @@ export async function removeMember(projectId: string, userId: string): Promise<v
 
 export async function updateProject(
   projectId: string,
-  details: { name?: string; description?: string | null },
+  details: { name?: string; description?: string | null; done_display_limit?: number | null },
 ): Promise<void> {
   const { error } = await supabase.from("projects").update(details).eq("id", projectId);
   if (error) throw error;

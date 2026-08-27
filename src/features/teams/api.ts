@@ -23,6 +23,7 @@ export type TeamProject = {
   team_id: string;
   owner_id: string;
   created_at: string;
+  done_display_limit: number | null;
   has_access: boolean;
 };
 
@@ -58,6 +59,22 @@ export async function inviteTeamMember(teamId: string, email: string): Promise<v
 
 export async function removeTeamMember(teamId: string, userId: string): Promise<void> {
   const { error } = await supabase.from("team_members").delete().eq("team_id", teamId).eq("user_id", userId);
+  if (error) throw error;
+}
+
+export async function updateTeam(teamId: string, details: { name: string }): Promise<void> {
+  const { error } = await supabase.from("teams").update(details).eq("id", teamId);
+  if (error) throw error;
+}
+
+/**
+ * Borrar el equipo NO borra sus proyectos: `projects.team_id` es
+ * `on delete set null`, así que cada proyecto vuelve a ser personal de su
+ * dueño. Los miembros que no eran dueños pierden acceso solo si además se los
+ * quita de `project_members` — el borrado del equipo por sí solo no los toca.
+ */
+export async function deleteTeam(teamId: string): Promise<void> {
+  const { error } = await supabase.from("teams").delete().eq("id", teamId);
   if (error) throw error;
 }
 

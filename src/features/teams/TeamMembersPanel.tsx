@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from "react";
 import { Avatar, AvatarUpload } from "../../components/Avatar";
 import { useAuth } from "../auth/AuthProvider";
+import { useDismissable } from "../../lib/useDismissable";
 import { useAppStore } from "../../store/useAppStore";
 import {
   useInviteTeamMember,
@@ -31,6 +32,8 @@ export function TeamMembersPanel({
   const [open, setOpen] = useState(false);
   const [email, setEmail] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
+  const containerRef = useDismissable(open, () => setOpen(false));
 
   const isAdmin = members?.some((m) => m.user_id === user?.id && m.role === "admin") ?? false;
   const isOwner = user?.id === ownerId;
@@ -46,16 +49,18 @@ export function TeamMembersPanel({
   async function handleInvite(e: FormEvent) {
     e.preventDefault();
     setError(null);
+    setNotice(null);
     try {
       await inviteMember.mutateAsync(email.trim());
       setEmail("");
+      setNotice("Invitación enviada. Le aparecerá en su buzón para aceptarla o rechazarla.");
     } catch (err) {
       setError(err instanceof Error ? err.message : "No se pudo invitar a esa persona.");
     }
   }
 
   return (
-    <div className="relative">
+    <div className="relative" ref={containerRef}>
       <button
         type="button"
         className="flex items-center -space-x-2"
@@ -128,6 +133,7 @@ export function TeamMembersPanel({
                 required
               />
               {error && <p className="text-error text-xs">{error}</p>}
+              {notice && <p className="text-on-surface-variant text-xs">{notice}</p>}
               <button
                 type="submit"
                 disabled={inviteMember.isPending}

@@ -1,6 +1,7 @@
 import { useRef, useState, type FormEvent } from "react";
 import { Avatar } from "../../components/Avatar";
 import { CheckCircleIcon, DownloadIcon, PaperclipIcon, TrashIcon } from "../../components/icons";
+import { useDismissable } from "../../lib/useDismissable";
 import { useAuth } from "../auth/AuthProvider";
 import { useProjectMembers } from "../projects/hooks";
 import { getAttachmentDownloadUrl, MAX_ATTACHMENT_SIZE } from "./attachments";
@@ -51,6 +52,8 @@ export function TaskDetailModal({
   const [newTagName, setNewTagName] = useState("");
   const [tagPickerOpen, setTagPickerOpen] = useState(false);
   const [assigneePickerOpen, setAssigneePickerOpen] = useState(false);
+  const tagPickerRef = useDismissable(tagPickerOpen, () => setTagPickerOpen(false));
+  const assigneePickerRef = useDismissable(assigneePickerOpen, () => setAssigneePickerOpen(false));
   const [newComment, setNewComment] = useState("");
   const [newSubtaskTitle, setNewSubtaskTitle] = useState("");
   const [attachmentError, setAttachmentError] = useState<string | null>(null);
@@ -254,7 +257,7 @@ export function TaskDetailModal({
                 </button>
               </span>
             ))}
-            <div className="relative">
+            <div className="relative" ref={tagPickerRef}>
               <button
                 type="button"
                 onClick={() => setTagPickerOpen((o) => !o)}
@@ -326,7 +329,7 @@ export function TaskDetailModal({
                 </button>
               </span>
             ))}
-            <div className="relative">
+            <div className="relative" ref={assigneePickerRef}>
               <button
                 type="button"
                 onClick={() => setAssigneePickerOpen((o) => !o)}

@@ -43,6 +43,27 @@ export function useRemoveTeamMember(teamId: string | null) {
   });
 }
 
+export function useUpdateTeam(teamId: string | null) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (details: { name: string }) => api.updateTeam(teamId as string, details),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["teams"] }),
+  });
+}
+
+export function useDeleteTeam() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (teamId: string) => api.deleteTeam(teamId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["teams"] });
+      // Sus proyectos pasan a ser personales: ambas listas cambian.
+      queryClient.invalidateQueries({ queryKey: ["projects"] });
+      queryClient.invalidateQueries({ queryKey: ["team-projects"] });
+    },
+  });
+}
+
 export function useTeamProjects(teamId: string | null) {
   return useQuery({
     queryKey: ["team-projects", teamId],

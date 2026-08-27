@@ -6,6 +6,9 @@ import { useDeleteProject, useUpdateProject } from "./hooks";
 export function ProjectSettings({ project, isOwner }: { project: Project; isOwner: boolean }) {
   const [name, setName] = useState(project.name);
   const [description, setDescription] = useState(project.description ?? "");
+  const [doneLimit, setDoneLimit] = useState(
+    project.done_display_limit === null ? "" : String(project.done_display_limit),
+  );
   const updateProject = useUpdateProject(project.id);
   const deleteProject = useDeleteProject();
   const { selectProject } = useAppStore();
@@ -20,6 +23,18 @@ export function ProjectSettings({ project, isOwner }: { project: Project; isOwne
     if (description !== (project.description ?? "")) {
       updateProject.mutate({ description: description || null });
     }
+  }
+
+  function commitDoneLimit() {
+    const trimmed = doneLimit.trim();
+    // Vacío = sin límite. Cualquier otra cosa que no sea un entero positivo se
+    // descarta y el campo vuelve a mostrar el valor guardado.
+    const parsed = trimmed === "" ? null : Number(trimmed);
+    if (parsed !== null && (!Number.isInteger(parsed) || parsed < 1)) {
+      setDoneLimit(project.done_display_limit === null ? "" : String(project.done_display_limit));
+      return;
+    }
+    if (parsed !== project.done_display_limit) updateProject.mutate({ done_display_limit: parsed });
   }
 
   function handleDelete() {
@@ -58,6 +73,29 @@ export function ProjectSettings({ project, isOwner }: { project: Project; isOwne
           onChange={(e) => setDescription(e.target.value)}
           onBlur={commitDescription}
         />
+      </div>
+
+      <div className="flex flex-col gap-2">
+        <label className="text-xs font-bold uppercase tracking-widest text-on-surface-variant" htmlFor="done-limit">
+          Tarjetas visibles en la columna de terminadas
+        </label>
+        <input
+          id="done-limit"
+          type="number"
+          min={1}
+          inputMode="numeric"
+          placeholder="Sin límite"
+          className="bg-surface-container-lowest border border-outline-variant/30 rounded-md px-3 py-2 text-sm text-on-surface w-40 focus:outline-none focus:ring-2 focus:ring-primary-container disabled:opacity-60"
+          value={doneLimit}
+          disabled={!isOwner}
+          onChange={(e) => setDoneLimit(e.target.value)}
+          onBlur={commitDoneLimit}
+          onKeyDown={(e) => e.key === "Enter" && (e.target as HTMLInputElement).blur()}
+        />
+        <p className="text-xs text-on-surface-variant">
+          El tablero muestra solo las más recientes; el resto se consultan en la pestaña History. Déjalo vacío para
+          mostrarlas todas.
+        </p>
       </div>
 
       {isOwner ? (

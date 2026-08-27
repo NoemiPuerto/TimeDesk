@@ -1,6 +1,9 @@
 import { useState, type FormEvent } from "react";
 import { useAuth } from "./AuthProvider";
 
+const INPUT_CLASS =
+  "rounded-sm bg-surface-container-lowest border border-outline-variant px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-container";
+
 function AuthShell({ children }: { children: React.ReactNode }) {
   return (
     <div className="min-h-screen bg-background text-on-background flex items-center justify-center p-8">
@@ -22,86 +25,104 @@ function AuthHeader({ subtitle }: { subtitle: string }) {
 function UpdatePasswordForm() {
   const { updatePassword } = useAuth();
   const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
-  const [done, setDone] = useState(false);
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     setError(null);
+    if (password !== confirmPassword) {
+      setError("Las contraseñas no coinciden.");
+      return;
+    }
     setSubmitting(true);
     const result = await updatePassword(password);
     setSubmitting(false);
+    // Al guardarla, el contexto sale del modo recuperación y la app se abre
+    // con la sesión que dejó el código: no hace falta volver a iniciar sesión.
     if (result.error) setError(result.error);
-    else setDone(true);
   }
 
   return (
     <AuthShell>
       <AuthHeader subtitle="Elige una contraseña nueva" />
-      {done ? (
-        <p className="text-sm text-on-surface text-center">
-          Contraseña actualizada. Ya puedes usarla la próxima vez que inicies sesión.
-        </p>
-      ) : (
-        <form className="flex flex-col gap-4" onSubmit={handleSubmit}>
-          <label className="flex flex-col gap-1 text-sm">
-            Contraseña nueva
-            <input
-              type="password"
-              minLength={6}
-              className="rounded-sm bg-surface-container-lowest border border-outline-variant px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-container"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-              autoFocus
-            />
-          </label>
-          {error && <p className="text-error text-sm">{error}</p>}
-          <button
-            type="submit"
-            disabled={submitting}
-            className="mt-2 rounded-full bg-primary-container text-on-primary text-sm font-medium py-2 hover:bg-primary transition-colors disabled:opacity-50"
-          >
-            {submitting ? "Un momento..." : "Guardar contraseña"}
-          </button>
-        </form>
-      )}
+      <form className="flex flex-col gap-4" onSubmit={handleSubmit}>
+        <label className="flex flex-col gap-1 text-sm">
+          Contraseña nueva
+          <input
+            type="password"
+            minLength={6}
+            className={INPUT_CLASS}
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            required
+            autoFocus
+          />
+        </label>
+        <label className="flex flex-col gap-1 text-sm">
+          Confirmar contraseña
+          <input
+            type="password"
+            minLength={6}
+            className={INPUT_CLASS}
+            value={confirmPassword}
+            onChange={(e) => setConfirmPassword(e.target.value)}
+            required
+          />
+        </label>
+        {error && <p className="text-error text-sm">{error}</p>}
+        <button
+          type="submit"
+          disabled={submitting}
+          className="mt-2 rounded-full bg-primary-container text-on-primary text-sm font-medium py-2 hover:bg-primary transition-colors disabled:opacity-50"
+        >
+          {submitting ? "Un momento..." : "Guardar contraseña"}
+        </button>
+      </form>
     </AuthShell>
   );
 }
 
 function ResetPasswordRequestForm({ onBack }: { onBack: () => void }) {
-  const { requestPasswordReset } = useAuth();
+  const { requestPasswordReset, verifyRecoveryCode } = useAuth();
   const [email, setEmail] = useState("");
+  const [code, setCode] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
-  const [sent, setSent] = useState(false);
+  const [step, setStep] = useState<"email" | "code">("email");
 
-  async function handleSubmit(e: FormEvent) {
+  async function handleSendEmail(e: FormEvent) {
     e.preventDefault();
     setError(null);
     setSubmitting(true);
     const result = await requestPasswordReset(email);
     setSubmitting(false);
     if (result.error) setError(result.error);
-    else setSent(true);
+    else setStep("code");
+  }
+
+  async function handleVerify(e: FormEvent) {
+    e.preventDefault();
+    setError(null);
+    setSubmitting(true);
+    const result = await verifyRecoveryCode(email, code);
+    setSubmitting(false);
+    // Si sale bien, el contexto marca passwordRecovery y AuthScreen cambia
+    // solo a la pantalla de contraseña nueva.
+    if (result.error) setError(result.error);
   }
 
   return (
     <AuthShell>
       <AuthHeader subtitle="Restablece tu contraseña" />
-      {sent ? (
-        <p className="text-sm text-on-surface text-center">
-          Si existe una cuenta con ese email, te enviamos un enlace para restablecer la contraseña.
-        </p>
-      ) : (
-        <form className="flex flex-col gap-4" onSubmit={handleSubmit}>
+      {step === "email" ? (
+        <form className="flex flex-col gap-4" onSubmit={handleSendEmail}>
           <label className="flex flex-col gap-1 text-sm">
             Email
             <input
               type="email"
-              className="rounded-sm bg-surface-container-lowest border border-outline-variant px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-container"
+              className={INPUT_CLASS}
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
@@ -114,7 +135,43 @@ function ResetPasswordRequestForm({ onBack }: { onBack: () => void }) {
             disabled={submitting}
             className="mt-2 rounded-full bg-primary-container text-on-primary text-sm font-medium py-2 hover:bg-primary transition-colors disabled:opacity-50"
           >
-            {submitting ? "Un momento..." : "Enviar enlace"}
+            {submitting ? "Un momento..." : "Enviar código"}
+          </button>
+        </form>
+      ) : (
+        <form className="flex flex-col gap-4" onSubmit={handleVerify}>
+          <p className="text-sm text-on-surface-variant">
+            Si existe una cuenta con <span className="text-on-surface">{email}</span>, te llegó un email. Escribe el
+            código de 6 dígitos, o copia y pega aquí el enlace del email.
+          </p>
+          <label className="flex flex-col gap-1 text-sm">
+            Código o enlace
+            <input
+              className={INPUT_CLASS}
+              placeholder="123456"
+              value={code}
+              onChange={(e) => setCode(e.target.value)}
+              required
+              autoFocus
+            />
+          </label>
+          {error && <p className="text-error text-sm">{error}</p>}
+          <button
+            type="submit"
+            disabled={submitting}
+            className="mt-2 rounded-full bg-primary-container text-on-primary text-sm font-medium py-2 hover:bg-primary transition-colors disabled:opacity-50"
+          >
+            {submitting ? "Comprobando..." : "Continuar"}
+          </button>
+          <button
+            type="button"
+            className="text-on-surface-variant text-xs underline self-center"
+            onClick={() => {
+              setError(null);
+              setStep("email");
+            }}
+          >
+            Volver a enviar el email
           </button>
         </form>
       )}
@@ -130,8 +187,10 @@ export function AuthScreen() {
   const [mode, setMode] = useState<"signin" | "signup" | "reset">("signin");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [displayName, setDisplayName] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
   if (passwordRecovery) return <UpdatePasswordForm />;
@@ -140,6 +199,13 @@ export function AuthScreen() {
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     setError(null);
+    setNotice(null);
+
+    if (mode === "signup" && password !== confirmPassword) {
+      setError("Las contraseñas no coinciden.");
+      return;
+    }
+
     setSubmitting(true);
     const result =
       mode === "signin"
@@ -147,6 +213,11 @@ export function AuthScreen() {
         : await signUp(email, password, displayName);
     setSubmitting(false);
     if (result.error) setError(result.error);
+    else if (mode === "signup") {
+      // Con confirmación de email activada en Supabase, signUp no deja sesión:
+      // sin este aviso la pantalla se queda igual y parece que no pasó nada.
+      setNotice("Cuenta creada. Revisa tu email para confirmarla y luego inicia sesión.");
+    }
   }
 
   return (
@@ -158,7 +229,7 @@ export function AuthScreen() {
           <label className="flex flex-col gap-1 text-sm">
             Nombre
             <input
-              className="rounded-sm bg-surface-container-lowest border border-outline-variant px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-container"
+              className={INPUT_CLASS}
               value={displayName}
               onChange={(e) => setDisplayName(e.target.value)}
               required
@@ -169,7 +240,7 @@ export function AuthScreen() {
           Email
           <input
             type="email"
-            className="rounded-sm bg-surface-container-lowest border border-outline-variant px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-container"
+            className={INPUT_CLASS}
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             required
@@ -180,12 +251,25 @@ export function AuthScreen() {
           <input
             type="password"
             minLength={6}
-            className="rounded-sm bg-surface-container-lowest border border-outline-variant px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-container"
+            className={INPUT_CLASS}
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             required
           />
         </label>
+        {mode === "signup" && (
+          <label className="flex flex-col gap-1 text-sm">
+            Confirmar contraseña
+            <input
+              type="password"
+              minLength={6}
+              className={INPUT_CLASS}
+              value={confirmPassword}
+              onChange={(e) => setConfirmPassword(e.target.value)}
+              required
+            />
+          </label>
+        )}
 
         {mode === "signin" && (
           <button
@@ -201,6 +285,7 @@ export function AuthScreen() {
         )}
 
         {error && <p className="text-error text-sm">{error}</p>}
+        {notice && <p className="text-on-surface text-sm">{notice}</p>}
 
         <button
           type="submit"
@@ -216,6 +301,8 @@ export function AuthScreen() {
         className="text-on-surface-variant text-xs underline self-center"
         onClick={() => {
           setError(null);
+          setNotice(null);
+          setConfirmPassword("");
           setMode(mode === "signin" ? "signup" : "signin");
         }}
       >

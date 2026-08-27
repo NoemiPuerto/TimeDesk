@@ -38,7 +38,7 @@ export function useInviteMember(projectId: string | null) {
 export function useUpdateProject(projectId: string | null) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (details: { name?: string; description?: string | null }) =>
+    mutationFn: (details: { name?: string; description?: string | null; done_display_limit?: number | null }) =>
       api.updateProject(projectId as string, details),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["projects"] });

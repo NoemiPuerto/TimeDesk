@@ -13,6 +13,8 @@ export function Column({
   projectId,
   isDoneColumn,
   tasksDragDisabled = false,
+  hiddenCount = 0,
+  onShowHistory,
   onOpenTask,
 }: {
   column: ColumnType;
@@ -20,6 +22,9 @@ export function Column({
   projectId: string;
   isDoneColumn: boolean;
   tasksDragDisabled?: boolean;
+  /** Terminadas que existen pero no se pintan, por el límite del proyecto. */
+  hiddenCount?: number;
+  onShowHistory?: () => void;
   onOpenTask: (taskId: string) => void;
 }) {
   const [editingName, setEditingName] = useState(false);
@@ -83,7 +88,7 @@ export function Column({
             >
               {column.name}
               <span className="bg-surface-container-highest px-2 py-0.5 rounded-full text-[10px] text-on-surface shrink-0">
-                {tasks.length}
+                {tasks.length + hiddenCount}
               </span>
             </h3>
           )}
@@ -92,7 +97,8 @@ export function Column({
           type="button"
           className="text-outline hover:text-error text-xs opacity-0 group-hover/header:opacity-100 transition-opacity shrink-0"
           onClick={() => {
-            if (tasks.length > 0 && !confirm(`Eliminar "${column.name}" y sus ${tasks.length} tareas?`)) return;
+            const affected = tasks.length + hiddenCount;
+            if (affected > 0 && !confirm(`Eliminar "${column.name}" y sus ${affected} tareas?`)) return;
             deleteColumn.mutate(column.id);
           }}
           aria-label="Eliminar columna"
@@ -119,6 +125,21 @@ export function Column({
             />
           ))}
         </SortableContext>
+
+        {hiddenCount > 0 &&
+          (onShowHistory ? (
+            <button
+              type="button"
+              onClick={onShowHistory}
+              className="text-xs text-on-surface-variant hover:text-primary text-left px-2 py-2 rounded-md border border-dashed border-outline-variant/40 hover:border-primary/50 transition-colors"
+            >
+              +{hiddenCount} terminada(s) más · ver History
+            </button>
+          ) : (
+            <p className="text-xs text-on-surface-variant/70 px-2 py-2 rounded-md border border-dashed border-outline-variant/40">
+              +{hiddenCount} terminada(s) de otras semanas
+            </p>
+          ))}
       </div>
     </div>
   );

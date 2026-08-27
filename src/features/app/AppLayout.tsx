@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { AvatarUpload } from "../../components/Avatar";
 import { UpdateBanner } from "../../components/UpdateBanner";
 import { BarChartIcon, ClockIcon, GridIcon, KanbanIcon, LogOutIcon, SettingsIcon } from "../../components/icons";
@@ -6,13 +6,17 @@ import { useAuth } from "../auth/AuthProvider";
 import { DashboardView } from "../dashboard/DashboardView";
 import { useMyProjects } from "../projects/hooks";
 import { MembersPanel } from "../projects/MembersPanel";
-import { ProjectSettings } from "../projects/ProjectSettings";
 import { ProjectSwitcher } from "../projects/ProjectSwitcher";
+import { SettingsView } from "../settings/SettingsView";
 import { useAppStore } from "../../store/useAppStore";
 import { TaskBoardArea } from "../board/TaskBoardArea";
 import { TimerSection } from "../timer/TimerSection";
 import { AnalyticsView } from "../analytics/AnalyticsView";
+import { NotificationBell } from "../notifications/NotificationBell";
+import { useUserRealtime } from "../notifications/hooks";
 import { useProjectRealtime } from "../realtime/useProjectRealtime";
+import { useActiveSession } from "../timer/hooks";
+import { useTimerLifecycle } from "../timer/useTimerLifecycle";
 import { useOnlineStatus } from "../../lib/useOnlineStatus";
 import { useMyProfile, useRemoveUserAvatar, useUploadUserAvatar } from "../profile/hooks";
 import { TeamSidebarMembers } from "../teams/TeamSidebarMembers";
@@ -38,9 +42,15 @@ export function AppLayout() {
   const { data: teams } = useMyTeams();
   const { data: teamProjects, isLoading: teamProjectsLoading } = useTeamProjects(selectedTeamId);
 
+  const { data: activeSession } = useActiveSession();
+
+  useUserRealtime(user?.id ?? null);
+  useTimerLifecycle({ enabled: !!user, hasActiveSession: !!activeSession });
+
   const isLoading = selectedTeamId ? teamProjectsLoading : personalLoading;
   const personalOnly = (personalProjects ?? []).filter((p) => !p.team_id);
   const selectedTeam = teams?.find((t) => t.id === selectedTeamId);
+  const hasNothingAtAll = !isLoading && personalOnly.length === 0 && (teams ?? []).length === 0;
 
   useEffect(() => {
     if (!selectedProjectId && !selectedTeamId && personalOnly.length > 0) {
@@ -48,6 +58,28 @@ export function AppLayout() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [personalProjects, selectedProjectId, selectedTeamId, selectProject]);
+
+  // Sin proyectos propios pero con equipos (el caso de alguien recién invitado):
+  // pararlo en "Personal" lo dejaba mirando una pantalla vacía sin pistas. Solo
+  // una vez por sesión: si después elige "Personal" a propósito (por ejemplo
+  // para crear su primer proyecto propio), no hay que devolverlo al equipo.
+  const autoPickedTeamRef = useRef(false);
+  useEffect(() => {
+    if (autoPickedTeamRef.current) return;
+    if (!selectedTeamId && personalOnly.length === 0 && (teams ?? []).length > 0) {
+      autoPickedTeamRef.current = true;
+      selectTeam(teams![0].id);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [teams, personalProjects, selectedTeamId]);
+
+  // El equipo elegido queda guardado entre sesiones: si mientras tanto salió de
+  // él (o se borró), hay que volver a "Personal" en vez de quedar en la nada.
+  useEffect(() => {
+    if (selectedTeamId && teams && !teams.some((t) => t.id === selectedTeamId)) {
+      selectTeam(null);
+    }
+  }, [teams, selectedTeamId, selectTeam]);
 
   const selectedProject = selectedTeamId
     ? teamProjects?.find((p) => p.id === selectedProjectId && p.has_access)
@@ -60,6 +92,11 @@ export function AppLayout() {
     selectTeam(project.team_id ?? null);
     selectProject(project.id);
     setActiveNav("tasks");
+  }
+
+  function handleOpenProjectById(projectId: string) {
+    const project = (personalProjects ?? []).find((p) => p.id === projectId);
+    if (project) handleOpenProject(project);
   }
 
   return (
@@ -126,6 +163,7 @@ export function AppLayout() {
             {activeNav === "dashboard" ? "Dashboard" : (selectedProject?.name ?? selectedTeam?.name ?? "TimeDesk")}
           </h2>
           <div className="flex items-center gap-4">
+            {user && <NotificationBell userId={user.id} onOpenProject={handleOpenProjectById} />}
             {activeNav !== "dashboard" && selectedProject && onlineMembers.length > 0 && (
               <span className="flex items-center gap-1.5 text-xs text-on-surface-variant">
                 <span className="w-1.5 h-1.5 rounded-full bg-primary" />
@@ -151,7 +189,7 @@ export function AppLayout() {
         </header>
 
         <div className="p-8 flex-1 overflow-y-auto">
-          {!isLoading && !selectedTeamId && personalOnly.length === 0 ? (
+          {hasNothingAtAll ? (
             <EmptyProjectsState />
           ) : (
             <>
@@ -163,35 +201,59 @@ export function AppLayout() {
                 <>
                   {isLoading && <p className="text-on-surface-variant text-sm">Cargando proyectos...</p>}
 
-                  {!isLoading && selectedTeamId && (teamProjects ?? []).length === 0 && (
+                  {/* La configuración del equipo no necesita un proyecto elegido: sin
+                      esta salvedad, los avisos de abajo taparían la única pantalla
+                      desde donde se administra el equipo. */}
+                  {activeNav !== "settings" && !isLoading && selectedTeamId && (teamProjects ?? []).length === 0 && (
                     <p className="text-on-surface-variant text-sm">
                       Este equipo todavía no tiene proyectos. Usa el selector de arriba a la izquierda para crear uno.
                     </p>
                   )}
 
-                  {!isLoading && selectedTeamId && (teamProjects ?? []).length > 0 && !selectedProject && (
+                  {activeNav !== "settings" &&
+                    !isLoading &&
+                    selectedTeamId &&
+                    (teamProjects ?? []).length > 0 &&
+                    !selectedProject && (
+                      <p className="text-on-surface-variant text-sm">
+                        Elige un proyecto del equipo en el selector de arriba a la izquierda.
+                      </p>
+                    )}
+
+                  {activeNav !== "settings" && !isLoading && !selectedTeamId && !selectedProject && (
                     <p className="text-on-surface-variant text-sm">
-                      Elige un proyecto del equipo en el selector de arriba a la izquierda.
+                      Elige un proyecto en el selector de arriba a la izquierda.
                     </p>
                   )}
 
+                  {/* key por proyecto: sin esto, cambiar de proyecto reusa la misma
+                      instancia y el estado local (columna destino, filtros, tarea
+                      abierta) se arrastra del proyecto anterior. */}
                   {!isLoading && selectedProject && activeNav === "timer" && (
                     <div className="space-y-8">
-                      <TimerSection projectId={selectedProject.id} projectName={selectedProject.name} />
-                      <TaskBoardArea projectId={selectedProject.id} boardOnly />
+                      <TimerSection
+                        key={selectedProject.id}
+                        projectId={selectedProject.id}
+                        projectName={selectedProject.name}
+                      />
+                      <TaskBoardArea key={selectedProject.id} projectId={selectedProject.id} boardOnly />
                     </div>
                   )}
 
                   {!isLoading && selectedProject && activeNav === "tasks" && (
-                    <TaskBoardArea projectId={selectedProject.id} />
+                    <TaskBoardArea
+                      key={selectedProject.id}
+                      projectId={selectedProject.id}
+                      doneDisplayLimit={selectedProject.done_display_limit}
+                    />
                   )}
 
                   {!isLoading && selectedProject && activeNav === "analytics" && (
                     <AnalyticsView projectId={selectedProject.id} />
                   )}
 
-                  {!isLoading && selectedProject && activeNav === "settings" && (
-                    <ProjectSettings project={selectedProject} isOwner={user?.id === selectedProject.owner_id} />
+                  {activeNav === "settings" && (
+                    <SettingsView project={selectedProject ?? null} team={selectedTeam ?? null} />
                   )}
                 </>
               )}

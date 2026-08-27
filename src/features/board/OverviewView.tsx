@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { totalHours } from "../analytics/utils";
+import { startOfWeek, toDateKey, totalHours } from "../analytics/utils";
 import { useProjectSessions } from "../timer/hooks";
 import { useColumns, useSubtaskCounts, useTasks } from "./hooks";
 
@@ -21,9 +21,11 @@ function StatTile({ label, value }: { label: string; value: string }) {
 export function OverviewView({
   projectId,
   onOpenTask,
+  onShowHistory,
 }: {
   projectId: string;
   onOpenTask: (taskId: string) => void;
+  onShowHistory?: () => void;
 }) {
   const { data: columns } = useColumns(projectId);
   const { data: tasks } = useTasks(projectId);
@@ -64,7 +66,17 @@ export function OverviewView({
     return { done, total };
   }, [subtaskCounts]);
 
-  const todayKey = new Date().toISOString().slice(0, 10);
+  const todayKey = toDateKey(new Date());
+
+  const completed = useMemo(() => {
+    const weekStart = startOfWeek(new Date()).getTime();
+    const done = (tasks ?? []).filter((t) => !!t.completed_at);
+    return {
+      total: done.length,
+      thisWeek: done.filter((t) => new Date(t.completed_at!).getTime() >= weekStart).length,
+      recent: [...done].sort((a, b) => b.completed_at!.localeCompare(a.completed_at!)).slice(0, 5),
+    };
+  }, [tasks]);
 
   return (
     <div className="flex flex-col gap-8">
@@ -72,7 +84,7 @@ export function OverviewView({
         <StatTile label="Tareas totales" value={String(totalTasks)} />
         <StatTile label="Horas registradas" value={`${projectHours.toFixed(1)}h`} />
         <StatTile label="Subtareas" value={subtaskTotals.total > 0 ? `${subtaskTotals.done}/${subtaskTotals.total}` : "—"} />
-        <StatTile label="Columnas" value={String(columns?.length ?? 0)} />
+        <StatTile label="Terminadas esta semana" value={String(completed.thisWeek)} />
       </div>
 
       {byColumn.length > 0 && (
@@ -95,7 +107,45 @@ export function OverviewView({
         </div>
       )}
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6 items-start">
+        <div className="bg-surface-container rounded-lg p-6 flex flex-col gap-3">
+          <div className="flex items-center justify-between gap-3">
+            <h3 className="text-sm font-bold uppercase tracking-widest text-on-surface-variant">
+              Terminadas recientemente
+            </h3>
+            {onShowHistory && completed.total > 0 && (
+              <button type="button" onClick={onShowHistory} className="text-xs text-primary hover:underline shrink-0">
+                Ver History
+              </button>
+            )}
+          </div>
+          {completed.recent.length === 0 ? (
+            <p className="text-xs text-on-surface-variant">Todavía no terminaste ninguna tarea.</p>
+          ) : (
+            <ul className="flex flex-col gap-1">
+              {completed.recent.map((t) => (
+                <li key={t.id}>
+                  <button
+                    type="button"
+                    onClick={() => onOpenTask(t.id)}
+                    className="w-full flex items-center justify-between gap-2 text-left hover:bg-surface-container-high rounded-sm px-2 py-1.5 -mx-2 transition-colors"
+                  >
+                    <span className="text-sm text-on-surface-variant line-through truncate">{t.title}</span>
+                    <span className="text-xs text-on-surface-variant shrink-0">
+                      {new Date(t.completed_at!).toLocaleDateString("es", { day: "numeric", month: "short" })}
+                    </span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+          {completed.total > completed.recent.length && (
+            <p className="text-xs text-on-surface-variant/70">
+              {completed.total} terminadas en total.
+            </p>
+          )}
+        </div>
+
         <div className="bg-surface-container rounded-lg p-6 flex flex-col gap-3">
           <h3 className="text-sm font-bold uppercase tracking-widest text-on-surface-variant">Prioridad</h3>
           {PRIORITY_META.map((p) => (

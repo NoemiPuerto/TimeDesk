@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { CheckCircleIcon, ClockIcon } from "../../components/icons";
 import { useAppStore } from "../../store/useAppStore";
-import { hoursByDay, totalHours } from "../analytics/utils";
+import { summarize, totalHours } from "../analytics/utils";
 import { useColumns, useTasks } from "../board/hooks";
 import { useActiveSession, useProjectSessions, useStartTimer, useStopTimer, useTaskSessions } from "./hooks";
 import { formatDuration, sessionSeconds, totalSeconds } from "./utils";
@@ -41,6 +41,9 @@ export function TimerSection({ projectId, projectName }: { projectId: string; pr
   const [now, setNow] = useState(() => Date.now());
 
   const isRunningHere = !!activeSession && activeSession.task_id === focusedTaskId;
+  // Un timer corriendo en OTRO proyecto: sin avisarlo, el timer de acá se ve
+  // en 00:00:00 y parece que no se registró nada.
+  const runningElsewhere = !!activeSession && activeSession.project_id !== projectId;
 
   useEffect(() => {
     if (!activeSession) return;
@@ -48,17 +51,25 @@ export function TimerSection({ projectId, projectName }: { projectId: string; pr
     return () => clearInterval(interval);
   }, [activeSession]);
 
-  // Recover a running timer after a page reload — runs once, the first time
-  // the active-session query resolves. Must not re-run on every change or it
-  // fights with handleStop's setFocusedTaskId(null) (stale cached
-  // activeSession still non-null right after the stop mutation fires).
+  // Recupera un timer que ya venía corriendo (recarga, o volver a este
+  // proyecto). Corre una sola vez, cuando la sesión activa Y las tareas de
+  // ESTE proyecto ya resolvieron: no puede re-ejecutarse en cada cambio o
+  // pelearía con el setFocusedTaskId(null) de handleStop (el activeSession
+  // cacheado sigue no-nulo justo después de disparar la mutación de stop).
+  //
+  // `focusedTaskId` es global, así que al cambiar de proyecto puede venir
+  // apuntando a una tarea del anterior; si no es de acá, se limpia.
   const hasSyncedOnLoad = useRef(false);
   useEffect(() => {
-    if (activeSessionLoaded && !hasSyncedOnLoad.current) {
-      hasSyncedOnLoad.current = true;
-      if (activeSession) setFocusedTaskId(activeSession.task_id);
+    if (!activeSessionLoaded || !tasks || hasSyncedOnLoad.current) return;
+    hasSyncedOnLoad.current = true;
+
+    if (activeSession && tasks.some((t) => t.id === activeSession.task_id)) {
+      setFocusedTaskId(activeSession.task_id);
+    } else if (focusedTaskId && !tasks.some((t) => t.id === focusedTaskId)) {
+      setFocusedTaskId(null);
     }
-  }, [activeSessionLoaded, activeSession, setFocusedTaskId]);
+  }, [activeSessionLoaded, activeSession, tasks, focusedTaskId, setFocusedTaskId]);
 
   const focusedTask = tasks?.find((t) => t.id === focusedTaskId);
   const currentSeconds = isRunningHere && activeSession ? sessionSeconds(activeSession, now) : 0;
@@ -83,7 +94,9 @@ export function TimerSection({ projectId, projectName }: { projectId: string; pr
   const doneRatio = totalTasks > 0 ? doneTasks / totalTasks : 0;
 
   const projectTotalHours = projectSessions ? totalHours(projectSessions, now) : 0;
-  const weekHours = projectSessions ? hoursByDay(projectSessions, 7, now).reduce((sum, d) => sum + d.hours, 0) : 0;
+  // Semana de calendario (lunes a domingo), no "últimos 7 días": es lo que se
+  // espera al leer "esta semana" y lo que muestra Analytics.
+  const weekHours = projectSessions ? summarize(projectSessions, now).thisWeek : 0;
 
   return (
     <section className="grid grid-cols-1 lg:grid-cols-4 gap-6">
@@ -122,6 +135,11 @@ export function TimerSection({ projectId, projectName }: { projectId: string; pr
               ? `Total en esta tarea: ${formatDuration(totalTaskSeconds)}`
               : "Elige una tarea del tablero (ícono ▶) para empezar a cronometrar."}
           </p>
+          {runningElsewhere && (
+            <p className="text-xs text-primary">
+              Tienes un timer corriendo en otro proyecto. Iniciar uno aquí lo detendrá.
+            </p>
+          )}
           <div className="flex items-center gap-6 mt-4">
             {isRunningHere ? (
               <button

@@ -7,7 +7,7 @@ import { ErrorBoundary } from "./components/ErrorBoundary";
 import { ToastContainer } from "./components/ToastContainer";
 
 function AppShell() {
-  const { session, loading } = useAuth();
+  const { session, loading, passwordRecovery } = useAuth();
 
   if (loading) {
     return (
@@ -17,7 +17,10 @@ function AppShell() {
     );
   }
 
-  if (!session) {
+  // Verificar el código de recuperación ya deja una sesión válida: sin mirar
+  // también `passwordRecovery`, la app se abriría directamente y el formulario
+  // de "contraseña nueva" no llegaría a mostrarse nunca.
+  if (!session || passwordRecovery) {
     return <AuthScreen />;
   }
 

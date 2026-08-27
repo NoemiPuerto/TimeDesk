@@ -1,5 +1,6 @@
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
 import { CalendarIcon } from "../../components/icons";
+import { useDismissable } from "../../lib/useDismissable";
 
 const WEEKDAYS = ["do", "lu", "ma", "mi", "ju", "vi", "sá"];
 const MONTHS = [
@@ -39,18 +40,7 @@ export function DueDatePicker({
   const [open, setOpen] = useState(false);
   const selected = value ? parseDateKey(value) : null;
   const [viewDate, setViewDate] = useState(() => selected ?? new Date());
-  const containerRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (!open) return;
-    function handleClick(e: MouseEvent) {
-      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
-        setOpen(false);
-      }
-    }
-    document.addEventListener("mousedown", handleClick);
-    return () => document.removeEventListener("mousedown", handleClick);
-  }, [open]);
+  const containerRef = useDismissable(open, () => setOpen(false));
 
   function openPicker() {
     setViewDate(selected ?? new Date());

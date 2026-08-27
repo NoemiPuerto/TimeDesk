@@ -11,7 +11,9 @@ export async function signUp(page: Page, email: string, displayName: string) {
   await page.getByRole("button", { name: "¿No tienes cuenta? Regístrate" }).click();
   await page.getByLabel("Nombre").fill(displayName);
   await page.getByLabel("Email").fill(email);
-  await page.getByLabel("Contraseña").fill(TEST_PASSWORD);
+  // exact: true — si no, "Contraseña" también matchea "Confirmar contraseña".
+  await page.getByLabel("Contraseña", { exact: true }).fill(TEST_PASSWORD);
+  await page.getByLabel("Confirmar contraseña").fill(TEST_PASSWORD);
   await page.getByRole("button", { name: "Crear cuenta" }).click();
 }
 

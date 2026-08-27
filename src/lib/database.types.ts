@@ -189,6 +189,155 @@ export type Database = {
           },
         ]
       }
+      invitations: {
+        Row: {
+          created_at: string
+          id: string
+          invitee_id: string
+          inviter_id: string
+          kind: string
+          project_id: string | null
+          project_name: string | null
+          responded_at: string | null
+          status: string
+          team_id: string | null
+          team_name: string | null
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          invitee_id: string
+          inviter_id: string
+          kind: string
+          project_id?: string | null
+          project_name?: string | null
+          responded_at?: string | null
+          status?: string
+          team_id?: string | null
+          team_name?: string | null
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          invitee_id?: string
+          inviter_id?: string
+          kind?: string
+          project_id?: string | null
+          project_name?: string | null
+          responded_at?: string | null
+          status?: string
+          team_id?: string | null
+          team_name?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "invitations_invitee_id_fkey"
+            columns: ["invitee_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "invitations_inviter_id_fkey"
+            columns: ["inviter_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "invitations_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "invitations_team_id_fkey"
+            columns: ["team_id"]
+            isOneToOne: false
+            referencedRelation: "teams"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      notifications: {
+        Row: {
+          actor_id: string | null
+          body: string | null
+          comment_id: string | null
+          created_at: string
+          id: string
+          project_id: string | null
+          read_at: string | null
+          task_id: string | null
+          task_title: string | null
+          type: string
+          user_id: string
+        }
+        Insert: {
+          actor_id?: string | null
+          body?: string | null
+          comment_id?: string | null
+          created_at?: string
+          id?: string
+          project_id?: string | null
+          read_at?: string | null
+          task_id?: string | null
+          task_title?: string | null
+          type: string
+          user_id: string
+        }
+        Update: {
+          actor_id?: string | null
+          body?: string | null
+          comment_id?: string | null
+          created_at?: string
+          id?: string
+          project_id?: string | null
+          read_at?: string | null
+          task_id?: string | null
+          task_title?: string | null
+          type?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "notifications_actor_id_fkey"
+            columns: ["actor_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "notifications_comment_id_fkey"
+            columns: ["comment_id"]
+            isOneToOne: false
+            referencedRelation: "comments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "notifications_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "notifications_task_id_fkey"
+            columns: ["task_id"]
+            isOneToOne: false
+            referencedRelation: "tasks"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "notifications_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           avatar_url: string | null
@@ -253,6 +402,7 @@ export type Database = {
         Row: {
           created_at: string
           description: string | null
+          done_display_limit: number | null
           id: string
           name: string
           owner_id: string
@@ -262,6 +412,7 @@ export type Database = {
         Insert: {
           created_at?: string
           description?: string | null
+          done_display_limit?: number | null
           id?: string
           name: string
           owner_id: string
@@ -271,6 +422,7 @@ export type Database = {
         Update: {
           created_at?: string
           description?: string | null
+          done_display_limit?: number | null
           id?: string
           name?: string
           owner_id?: string
@@ -437,6 +589,7 @@ export type Database = {
       tasks: {
         Row: {
           column_id: string
+          completed_at: string | null
           created_at: string
           created_by: string
           description: string | null
@@ -450,6 +603,7 @@ export type Database = {
         }
         Insert: {
           column_id: string
+          completed_at?: string | null
           created_at?: string
           created_by: string
           description?: string | null
@@ -463,6 +617,7 @@ export type Database = {
         }
         Update: {
           column_id?: string
+          completed_at?: string | null
           created_at?: string
           created_by?: string
           description?: string | null
@@ -570,6 +725,7 @@ export type Database = {
         Row: {
           ended_at: string | null
           id: string
+          last_heartbeat_at: string
           project_id: string
           started_at: string
           task_id: string
@@ -578,6 +734,7 @@ export type Database = {
         Insert: {
           ended_at?: string | null
           id?: string
+          last_heartbeat_at?: string
           project_id: string
           started_at?: string
           task_id: string
@@ -586,6 +743,7 @@ export type Database = {
         Update: {
           ended_at?: string | null
           id?: string
+          last_heartbeat_at?: string
           project_id?: string
           started_at?: string
           task_id?: string
@@ -693,6 +851,7 @@ export type Database = {
         Returns: {
           created_at: string
           description: string | null
+          done_display_limit: number | null
           id: string
           name: string
           owner_id: string
@@ -744,6 +903,7 @@ export type Database = {
         Args: { p_column_id: string; p_project_id: string; p_title: string }
         Returns: {
           column_id: string
+          completed_at: string | null
           created_at: string
           created_by: string
           description: string | null
@@ -778,17 +938,46 @@ export type Database = {
           isSetofReturn: false
         }
       }
-      invite_project_member: {
-        Args: { p_email: string; p_project_id: string }
+      close_stale_timer: {
+        Args: { p_stale_seconds?: number }
         Returns: {
-          joined_at: string
+          ended_at: string | null
+          id: string
+          last_heartbeat_at: string
           project_id: string
-          role: string
+          started_at: string
+          task_id: string
           user_id: string
         }
         SetofOptions: {
           from: "*"
-          to: "project_members"
+          to: "time_sessions"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      heartbeat_timer: {
+        Args: Record<PropertyKey, never>
+        Returns: string | null
+      }
+      invite_project_member: {
+        Args: { p_email: string; p_project_id: string }
+        Returns: {
+          created_at: string
+          id: string
+          invitee_id: string
+          inviter_id: string
+          kind: string
+          project_id: string | null
+          project_name: string | null
+          responded_at: string | null
+          status: string
+          team_id: string | null
+          team_name: string | null
+        }
+        SetofOptions: {
+          from: "*"
+          to: "invitations"
           isOneToOne: true
           isSetofReturn: false
         }
@@ -796,14 +985,43 @@ export type Database = {
       invite_team_member: {
         Args: { p_email: string; p_team_id: string }
         Returns: {
-          joined_at: string
-          role: string
-          team_id: string
-          user_id: string
+          created_at: string
+          id: string
+          invitee_id: string
+          inviter_id: string
+          kind: string
+          project_id: string | null
+          project_name: string | null
+          responded_at: string | null
+          status: string
+          team_id: string | null
+          team_name: string | null
         }
         SetofOptions: {
           from: "*"
-          to: "team_members"
+          to: "invitations"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      respond_invitation: {
+        Args: { p_accept: boolean; p_invitation_id: string }
+        Returns: {
+          created_at: string
+          id: string
+          invitee_id: string
+          inviter_id: string
+          kind: string
+          project_id: string | null
+          project_name: string | null
+          responded_at: string | null
+          status: string
+          team_id: string | null
+          team_name: string | null
+        }
+        SetofOptions: {
+          from: "*"
+          to: "invitations"
           isOneToOne: true
           isSetofReturn: false
         }
@@ -833,6 +1051,7 @@ export type Database = {
         Returns: {
           created_at: string
           description: string
+          done_display_limit: number | null
           has_access: boolean
           id: string
           name: string
@@ -845,6 +1064,7 @@ export type Database = {
         Returns: {
           ended_at: string | null
           id: string
+          last_heartbeat_at: string
           project_id: string
           started_at: string
           task_id: string

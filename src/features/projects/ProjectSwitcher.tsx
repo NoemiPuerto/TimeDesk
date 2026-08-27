@@ -1,4 +1,5 @@
 import { useMemo, useState, type FormEvent } from "react";
+import { useDismissable } from "../../lib/useDismissable";
 import { useAppStore } from "../../store/useAppStore";
 import { useAuth } from "../auth/AuthProvider";
 import { useTeamMembers, useTeamProjects } from "../teams/hooks";
@@ -15,6 +16,12 @@ export function ProjectSwitcher() {
   const [creating, setCreating] = useState(false);
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
+
+  function close() {
+    setOpen(false);
+    setCreating(false);
+  }
+  const containerRef = useDismissable(open, close);
 
   const isTeamAdmin = teamMembers?.some((m) => m.user_id === user?.id && m.role === "admin") ?? false;
   const canCreate = !selectedTeamId || isTeamAdmin;
@@ -42,7 +49,7 @@ export function ProjectSwitcher() {
   }
 
   return (
-    <div className="relative px-2">
+    <div className="relative px-2" ref={containerRef}>
       <button
         type="button"
         aria-label="Selector de proyecto"

@@ -20,6 +20,8 @@ export type Task = {
   due_date: string | null;
   position: number;
   created_at: string;
+  /** Momento en que pasó a la última columna. Lo mantiene un trigger. */
+  completed_at: string | null;
 };
 
 export type TaskDetails = {
@@ -67,7 +69,7 @@ export async function reorderColumns(updates: { id: string; position: number }[]
 export async function listTasks(projectId: string): Promise<Task[]> {
   const { data, error } = await supabase
     .from("tasks")
-    .select("id, project_id, column_id, title, description, priority, due_date, position, created_at")
+    .select("id, project_id, column_id, title, description, priority, due_date, position, created_at, completed_at")
     .eq("project_id", projectId)
     .order("position", { ascending: true });
   if (error) throw error;
