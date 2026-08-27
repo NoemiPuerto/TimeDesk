@@ -45,10 +45,30 @@ export function startOfMonth(d: Date): Date {
   return copy;
 }
 
-function sessionHours(session: TimeSession, now: number): number {
+function sessionRange(session: TimeSession, now: number): { start: number; end: number } {
   const start = new Date(session.started_at).getTime();
   const end = session.ended_at ? new Date(session.ended_at).getTime() : now;
-  return Math.max(0, (end - start) / 1000 / 3600);
+  return { start, end: Math.max(start, end) };
+}
+
+function sessionHours(session: TimeSession, now: number): number {
+  const { start, end } = sessionRange(session, now);
+  return (end - start) / 1000 / 3600;
+}
+
+/**
+ * Horas de la sesión que caen DENTRO de [from, to).
+ *
+ * Antes cada sesión se contaba entera en el período donde empezó. Una que
+ * cruzaba la medianoche (o el fin de semana, o el fin de mes) le sumaba a un
+ * día horas que se trabajaron en otro, y la suma de las barras no coincidía con
+ * lo que la persona recordaba haber hecho ese día. Ahora se reparte por
+ * solapamiento real: la suma de todos los períodos da exactamente el total.
+ */
+function overlapHours(session: TimeSession, from: number, to: number, now: number): number {
+  const { start, end } = sessionRange(session, now);
+  const overlap = Math.min(end, to) - Math.max(start, from);
+  return overlap > 0 ? overlap / 1000 / 3600 : 0;
 }
 
 function round2(hours: number): number {
@@ -59,42 +79,28 @@ export function totalHours(sessions: TimeSession[], now: number): number {
   return sessions.reduce((sum, s) => sum + sessionHours(s, now), 0);
 }
 
-/** Horas de las sesiones que EMPEZARON dentro de [from, to). */
+/** Horas trabajadas dentro de [from, to), repartiendo las sesiones que lo cruzan. */
 export function hoursBetween(sessions: TimeSession[], from: Date, to: Date, now: number): number {
   const fromMs = from.getTime();
   const toMs = to.getTime();
-  return sessions.reduce((sum, s) => {
-    const started = new Date(s.started_at).getTime();
-    return started >= fromMs && started < toMs ? sum + sessionHours(s, now) : sum;
-  }, 0);
+  return sessions.reduce((sum, s) => sum + overlapHours(s, fromMs, toMs, now), 0);
 }
 
 /**
- * Reparte las sesiones en cubetas consecutivas. Una sesión cuenta entera en el
- * período donde EMPEZÓ; una que cruza la medianoche no se parte (simplificación
- * a propósito: partirla complicaría todo para un caso poco frecuente en una app
- * de time tracking personal).
+ * Reparte las sesiones en cubetas consecutivas por solapamiento real, así una
+ * sesión que cruza la medianoche le suma a cada día lo que le corresponde.
  */
 function bucketize(
   sessions: TimeSession[],
   now: number,
   buckets: { key: string; start: Date; end: Date; label: string; sublabel?: string }[],
 ): BucketHours[] {
-  const totals = new Map(buckets.map((b) => [b.key, 0]));
-
-  for (const session of sessions) {
-    const started = new Date(session.started_at).getTime();
-    const bucket = buckets.find((b) => started >= b.start.getTime() && started < b.end.getTime());
-    if (!bucket) continue;
-    totals.set(bucket.key, (totals.get(bucket.key) ?? 0) + sessionHours(session, now));
-  }
-
-  return buckets.map((b) => ({
-    key: b.key,
-    label: b.label,
-    sublabel: b.sublabel,
-    hours: round2(totals.get(b.key) ?? 0),
-  }));
+  return buckets.map((b) => {
+    const from = b.start.getTime();
+    const to = b.end.getTime();
+    const hours = sessions.reduce((sum, s) => sum + overlapHours(s, from, to, now), 0);
+    return { key: b.key, label: b.label, sublabel: b.sublabel, hours: round2(hours) };
+  });
 }
 
 export function hoursByDay(sessions: TimeSession[], days: number, now: number): BucketHours[] {
@@ -108,8 +114,10 @@ export function hoursByDay(sessions: TimeSession[], days: number, now: number): 
       key: toDateKey(start),
       start,
       end,
-      label: start.toLocaleDateString("es", { weekday: "short" }),
-      sublabel: start.toLocaleDateString("es", { day: "numeric", month: "short" }),
+      // El día del mes es único dentro de la ventana; el nombre del día se
+      // repetiría cada 7 barras y no sirve para identificar una en concreto.
+      label: String(start.getDate()),
+      sublabel: start.toLocaleDateString("es", { weekday: "long", day: "numeric", month: "long" }),
     });
   }
   return bucketize(sessions, now, buckets);
@@ -185,6 +193,29 @@ export type SessionSummary = {
   longestSession: number;
 };
 
+/**
+ * Un resumen por persona.
+ *
+ * Solo puede devolver a alguien más que quien consulta si la base se lo
+ * permitió: la política SELECT de `time_sessions` no entrega sesiones ajenas de
+ * un proyecto con equipo salvo al admin de ese equipo. Acá no hay ningún filtro
+ * de permisos — si la fila llegó, es porque se podía ver.
+ */
+export function summarizeByUser(sessions: TimeSession[], now: number): Map<string, SessionSummary> {
+  const byUser = new Map<string, TimeSession[]>();
+  for (const session of sessions) {
+    const list = byUser.get(session.user_id) ?? [];
+    list.push(session);
+    byUser.set(session.user_id, list);
+  }
+
+  const result = new Map<string, SessionSummary>();
+  for (const [userId, list] of byUser) {
+    result.set(userId, summarize(list, now));
+  }
+  return result;
+}
+
 export function summarize(sessions: TimeSession[], now: number): SessionSummary {
   const today = startOfDay(new Date(now));
   const tomorrow = new Date(today);
@@ -200,13 +231,28 @@ export function summarize(sessions: TimeSession[], now: number): SessionSummary 
   const nextMonth = new Date(monthStart);
   nextMonth.setMonth(nextMonth.getMonth() + 1);
 
+  // Mismo criterio que las barras: cada sesión le suma a cada día lo que
+  // realmente ocurrió en ese día, así "días trabajados" y "mejor día" no
+  // contradicen al gráfico.
   const perDay = new Map<string, number>();
   let longestSession = 0;
   for (const session of sessions) {
-    const hours = sessionHours(session, now);
-    longestSession = Math.max(longestSession, hours);
-    const key = toDateKey(new Date(session.started_at));
-    perDay.set(key, (perDay.get(key) ?? 0) + hours);
+    const { start, end } = sessionRange(session, now);
+    longestSession = Math.max(longestSession, (end - start) / 1000 / 3600);
+
+    const cursor = startOfDay(new Date(start));
+    // Tope de seguridad: una sesión que quedó abierta mucho tiempo no debe
+    // poder colgar el render con un bucle de miles de días.
+    for (let guard = 0; cursor.getTime() < end && guard < 400; guard++) {
+      const dayEnd = new Date(cursor);
+      dayEnd.setDate(dayEnd.getDate() + 1);
+      const hours = overlapHours(session, cursor.getTime(), dayEnd.getTime(), now);
+      if (hours > 0) {
+        const key = toDateKey(cursor);
+        perDay.set(key, (perDay.get(key) ?? 0) + hours);
+      }
+      cursor.setDate(cursor.getDate() + 1);
+    }
   }
 
   let bestDay: { key: string; hours: number } | null = null;

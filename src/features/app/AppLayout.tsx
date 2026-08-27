@@ -249,7 +249,11 @@ export function AppLayout() {
                   )}
 
                   {!isLoading && selectedProject && activeNav === "analytics" && (
-                    <AnalyticsView projectId={selectedProject.id} />
+                    <AnalyticsView
+                      projectId={selectedProject.id}
+                      teamId={selectedProject.team_id}
+                      ownerId={selectedProject.owner_id}
+                    />
                   )}
 
                   {activeNav === "settings" && (
