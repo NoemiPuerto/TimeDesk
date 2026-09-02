@@ -35,3 +35,6 @@ dist-ssr
 /playwright-report/
 /blob-report/
 /playwright/.cache/
+
+# Config local de herramientas: puede contener claves de API
+.codex/
