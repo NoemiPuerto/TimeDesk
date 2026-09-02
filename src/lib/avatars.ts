@@ -33,6 +33,19 @@ export async function removeUserAvatar(userId: string): Promise<void> {
   if (error) throw error;
 }
 
+export async function uploadProjectCover(projectId: string, file: File): Promise<string> {
+  const url = await uploadAvatarObject(`projects/${projectId}`, file);
+  const { error } = await supabase.from("projects").update({ cover_url: url }).eq("id", projectId);
+  if (error) throw error;
+  return url;
+}
+
+export async function removeProjectCover(projectId: string): Promise<void> {
+  await removeAvatarObject(`projects/${projectId}`);
+  const { error } = await supabase.from("projects").update({ cover_url: null }).eq("id", projectId);
+  if (error) throw error;
+}
+
 export async function uploadTeamAvatar(teamId: string, file: File): Promise<string> {
   const url = await uploadAvatarObject(`teams/${teamId}`, file);
   const { error } = await supabase.from("teams").update({ avatar_url: url }).eq("id", teamId);

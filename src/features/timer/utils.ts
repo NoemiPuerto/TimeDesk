@@ -2,7 +2,10 @@ import type { TimeSession } from "./api";
 
 export function sessionSeconds(session: TimeSession, now: number): number {
   const start = new Date(session.started_at).getTime();
-  const end = session.ended_at ? new Date(session.ended_at).getTime() : now;
+  // Una fecha ilegible no debe convertirse en una duración enorme: se ignora.
+  if (!Number.isFinite(start)) return 0;
+  const parsedEnd = session.ended_at ? new Date(session.ended_at).getTime() : now;
+  const end = Number.isFinite(parsedEnd) ? parsedEnd : now;
   return Math.max(0, Math.floor((end - start) / 1000));
 }
 

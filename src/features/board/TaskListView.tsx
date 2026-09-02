@@ -26,7 +26,10 @@ export function TaskListView({
   const { data: assigneesMap } = useTaskAssigneesMap(projectId);
   const { data: commentCounts } = useCommentCounts(projectId);
 
-  const filteredTasks = useMemo(() => applyTaskFilters(tasks ?? [], filters), [tasks, filters]);
+  const filteredTasks = useMemo(
+    () => applyTaskFilters(tasks ?? [], filters, { assigneesByTask: assigneesMap, tagsByTask: tagsMap }),
+    [tasks, filters, assigneesMap, tagsMap],
+  );
 
   const tasksByColumn = useMemo(() => {
     const map = new Map<string, Task[]>();

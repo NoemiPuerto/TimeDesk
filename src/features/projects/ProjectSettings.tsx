@@ -1,16 +1,22 @@
 import { useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
+import { removeProjectCover, uploadProjectCover } from "../../lib/avatars";
 import { useAppStore } from "../../store/useAppStore";
 import type { Project } from "./api";
+import { CategoryField } from "./categories";
 import { useDeleteProject, useUpdateProject } from "./hooks";
+import { ProjectCoverField } from "./ProjectCover";
 
 export function ProjectSettings({ project, isOwner }: { project: Project; isOwner: boolean }) {
   const [name, setName] = useState(project.name);
   const [description, setDescription] = useState(project.description ?? "");
+  const [category, setCategory] = useState(project.category ?? "");
   const [doneLimit, setDoneLimit] = useState(
     project.done_display_limit === null ? "" : String(project.done_display_limit),
   );
   const updateProject = useUpdateProject(project.id);
   const deleteProject = useDeleteProject();
+  const queryClient = useQueryClient();
   const { selectProject } = useAppStore();
 
   function commitName() {
@@ -23,6 +29,30 @@ export function ProjectSettings({ project, isOwner }: { project: Project; isOwne
     if (description !== (project.description ?? "")) {
       updateProject.mutate({ description: description || null });
     }
+  }
+
+  function commitCategory() {
+    const trimmed = category.trim();
+    if (trimmed !== (project.category ?? "")) updateProject.mutate({ category: trimmed || null });
+  }
+
+  // `uploadProjectCover` ya escribe `cover_url` en la fila, así que aquí solo
+  // queda refrescar las listas que pintan la portada.
+  function refreshProjects() {
+    queryClient.invalidateQueries({ queryKey: ["projects"] });
+    queryClient.invalidateQueries({ queryKey: ["team-projects"] });
+  }
+
+  // La portada sí se sube en el momento: aquí el proyecto ya existe, así que
+  // hay ruta de Storage a la que subirla (al crearlo todavía no la hay).
+  async function handleCoverPick(file: File) {
+    await uploadProjectCover(project.id, file);
+    refreshProjects();
+  }
+
+  async function handleCoverRemove() {
+    await removeProjectCover(project.id);
+    refreshProjects();
   }
 
   function commitDoneLimit() {
@@ -49,6 +79,18 @@ export function ProjectSettings({ project, isOwner }: { project: Project; isOwne
 
   return (
     <div className="max-w-xl flex flex-col gap-8">
+      <div className="flex flex-col gap-2 max-w-sm">
+        <span className="text-xs font-bold uppercase tracking-widest text-on-surface-variant">Portada</span>
+        <ProjectCoverField
+          coverUrl={project.cover_url}
+          seed={project.id}
+          name={project.name}
+          disabled={!isOwner}
+          onPick={handleCoverPick}
+          onRemove={handleCoverRemove}
+        />
+      </div>
+
       <div className="flex flex-col gap-2">
         <label className="text-xs font-bold uppercase tracking-widest text-on-surface-variant">
           Nombre del proyecto
@@ -72,6 +114,21 @@ export function ProjectSettings({ project, isOwner }: { project: Project; isOwne
           disabled={!isOwner}
           onChange={(e) => setDescription(e.target.value)}
           onBlur={commitDescription}
+        />
+      </div>
+
+      <div className="flex flex-col gap-2 max-w-xs">
+        <label
+          className="text-xs font-bold uppercase tracking-widest text-on-surface-variant"
+          htmlFor="project-category"
+        >
+          Categoría
+        </label>
+        <CategoryField
+          value={category}
+          onChange={setCategory}
+          onCommit={commitCategory}
+          disabled={!isOwner}
         />
       </div>
 

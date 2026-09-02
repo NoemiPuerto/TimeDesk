@@ -1,10 +1,20 @@
 import { DndContext, closestCorners, PointerSensor, useSensor, useSensors, type DragEndEvent } from "@dnd-kit/core";
 import { arrayMove, horizontalListSortingStrategy, SortableContext } from "@dnd-kit/sortable";
 import { useMemo, useState, type FormEvent } from "react";
-import { startOfWeek } from "../analytics/utils";
 import type { Task } from "./api";
 import { applyTaskFilters, DEFAULT_TASK_FILTERS, hasActiveFilters, type TaskFilters } from "./filters";
-import { useColumns, useCreateColumn, useReorderColumns, useReorderTasks, useTasks } from "./hooks";
+import {
+  useColumns,
+  useCreateColumn,
+  useMoveTaskToColumn,
+  useReorderColumns,
+  useReorderTasks,
+  useTaskAssigneesMap,
+  useTasks,
+  useTaskTagsMap,
+  useTimerTasks,
+} from "./hooks";
+import { sortByUrgency, timerWindow } from "./urgency";
 import { Column } from "./Column";
 import { QuickAddTask } from "./QuickAddTask";
 
@@ -13,7 +23,7 @@ export function KanbanBoard({
   onOpenTask,
   filters = DEFAULT_TASK_FILTERS,
   doneDisplayLimit = null,
-  recentOnly = false,
+  timerMode = false,
   onShowHistory,
 }: {
   projectId: string;
@@ -21,29 +31,39 @@ export function KanbanBoard({
   filters?: TaskFilters;
   /** Tarjetas visibles en la columna de terminadas. null = todas. */
   doneDisplayLimit?: number | null;
-  /** Vista del Timer: esconde lo terminado antes de esta semana. */
-  recentOnly?: boolean;
+  /**
+   * Tablero del Timer: solo la ventana hoy..hoy+6 (filtrada en la consulta) y
+   * ordenado por urgencia en vez de por el orden manual.
+   */
+  timerMode?: boolean;
   onShowHistory?: () => void;
 }) {
   const { data: columns, isLoading: columnsLoading } = useColumns(projectId);
-  const { data: tasks, isLoading: tasksLoading } = useTasks(projectId);
+  // Solo una de las dos consultas se activa; la otra queda deshabilitada.
+  const fullTasks = useTasks(timerMode ? null : projectId);
+  const windowTasks = useTimerTasks(timerMode ? projectId : null);
+  const { data: tasks, isLoading: tasksLoading } = timerMode ? windowTasks : fullTasks;
+  // Los filtros por persona y por etiqueta viven en tablas aparte; las
+  // consultas ya están en marcha por las propias tarjetas, así que
+  // react-query las comparte en vez de repetirlas.
+  const { data: assigneesByTask } = useTaskAssigneesMap(projectId);
+  const { data: tagsByTask } = useTaskTagsMap(projectId);
+  const { todayKey } = timerWindow();
   const createColumn = useCreateColumn(projectId);
   const reorderTasks = useReorderTasks(projectId);
+  const moveTaskToColumn = useMoveTaskToColumn(projectId);
   const reorderColumns = useReorderColumns(projectId);
   const [newColumnName, setNewColumnName] = useState("");
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 4 } }));
 
-  const filteredTasks = useMemo(() => applyTaskFilters(tasks ?? [], filters), [tasks, filters]);
+  const filteredTasks = useMemo(
+    () => applyTaskFilters(tasks ?? [], filters, { assigneesByTask, tagsByTask }),
+    [tasks, filters, assigneesByTask, tagsByTask],
+  );
 
-  // En el Timer el tablero es "lo que estoy haciendo ahora": las terminadas de
-  // semanas anteriores solo estorban. Las abiertas se muestran siempre, sin
-  // importar cuándo se crearon.
-  const visibleTasks = useMemo(() => {
-    if (!recentOnly) return filteredTasks;
-    const weekStart = startOfWeek(new Date()).getTime();
-    return filteredTasks.filter((t) => !t.completed_at || new Date(t.completed_at).getTime() >= weekStart);
-  }, [filteredTasks, recentOnly]);
+  // El recorte por fechas ya lo hizo la consulta; aquí solo queda el orden.
+  const visibleTasks = filteredTasks;
 
   const tasksByColumn = useMemo(() => {
     const map = new Map<string, Task[]>();
@@ -52,11 +72,15 @@ export function KanbanBoard({
       list.push(task);
       map.set(task.column_id, list);
     }
-    if (filters.sortBy === "manual") {
+    if (timerMode) {
+      // Lo que aprieta, arriba: vencidas, luego hoy, luego por fecha, y las
+      // que no tienen fecha al final.
+      for (const [columnId, list] of map) map.set(columnId, sortByUrgency(list, todayKey));
+    } else if (filters.sortBy === "manual") {
       for (const list of map.values()) list.sort((a, b) => a.position - b.position);
     }
     return map;
-  }, [visibleTasks, filters.sortBy]);
+  }, [visibleTasks, filters.sortBy, timerMode, todayKey]);
 
   function handleColumnDragEnd(activeColId: string, overColId: string) {
     if (!columns || activeColId === overColId) return;
@@ -106,6 +130,18 @@ export function KanbanBoard({
     if (!destColumnId) return;
 
     const sourceColumnId = activeTask.column_id;
+
+    // En el Timer la lista está recortada por fechas y ordenada por urgencia:
+    // renumerar posiciones desde aquí las calcularía contra una lista
+    // incompleta. Se permite lo útil —mover de columna, p. ej. darla por
+    // terminada— sin tocar el orden manual, que se edita en la pestaña Tasks.
+    if (timerMode) {
+      if (sourceColumnId !== destColumnId) {
+        moveTaskToColumn.mutate({ taskId: activeTask.id, columnId: destColumnId });
+      }
+      return;
+    }
+
     const sourceList = (tasksByColumn.get(sourceColumnId) ?? []).map((t) => t.id);
     const destList =
       sourceColumnId === destColumnId ? sourceList : (tasksByColumn.get(destColumnId) ?? []).map((t) => t.id);

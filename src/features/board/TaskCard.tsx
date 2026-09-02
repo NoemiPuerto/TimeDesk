@@ -13,6 +13,7 @@ import {
 import { useAppStore } from "../../store/useAppStore";
 import { useActiveSession, useStartTimer, useStopTimer } from "../timer/hooks";
 import type { Task } from "./api";
+import { dueState, timerWindow } from "./urgency";
 import {
   useAttachmentCounts,
   useCommentCounts,
@@ -86,6 +87,11 @@ export function TaskCard({
     ? new Date(task.due_date + "T00:00:00").toLocaleDateString("es", { day: "numeric", month: "short" })
     : null;
 
+  // Una tarea terminada ya no vence, por muy pasada que esté su fecha.
+  const state = isDone ? "none" : dueState(task.due_date, timerWindow().todayKey);
+  const isOverdue = state === "overdue";
+  const isDueToday = state === "today";
+
   return (
     <div
       ref={setNodeRef}
@@ -100,6 +106,8 @@ export function TaskCard({
           ? "bg-surface-container-lowest/60 border border-outline-variant/15 opacity-70"
           : isActive
             ? "bg-surface-container-lowest border-2 border-primary-container hover:shadow-md"
+            : isOverdue
+              ? "bg-surface-container-lowest border border-error/50 hover:shadow-md"
             : "bg-surface-container-lowest border border-outline-variant/30 hover:shadow-md"
       }`}
     >
@@ -128,8 +136,13 @@ export function TaskCard({
         )}
       </div>
 
-      {(priority || tags.length > 0) && (
+      {(priority || tags.length > 0 || isOverdue) && (
         <div className="flex flex-wrap items-center gap-1.5 mb-2 pr-8">
+          {isOverdue && (
+            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase bg-error text-white">
+              Vencida
+            </span>
+          )}
           {priority && (
             <span
               className="flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase"
@@ -162,9 +175,13 @@ export function TaskCard({
       <div className="flex items-center justify-between mt-3 pt-2 border-t border-outline-variant/10">
         <span className="flex items-center gap-2.5 text-[11px] text-on-surface-variant">
           {dueDateLabel && (
-            <span className="flex items-center gap-1">
+            <span
+              className={`flex items-center gap-1 ${
+                isOverdue ? "text-error font-medium" : isDueToday ? "text-primary font-medium" : ""
+              }`}
+            >
               <CalendarIcon className="w-3 h-3" />
-              {dueDateLabel}
+              {isDueToday ? "Hoy" : dueDateLabel}
             </span>
           )}
           {commentCount > 0 && (

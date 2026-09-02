@@ -44,7 +44,11 @@ export function useTimerLifecycle({
       if (!closed) return;
 
       const worked = formatDuration(sessionSeconds(closed, Date.now()));
-      pushToast(`Tu timer se detuvo solo: la app dejó de responder (cierre o suspensión). Se registraron ${worked}.`);
+      // Informativo, no un error: es el comportamiento correcto y esperado.
+      // Redactado antes como "la app dejó de responder", que se lee como un
+      // fallo de la aplicación cuando en realidad es la red de seguridad
+      // haciendo su trabajo.
+      pushToast(`Se cerró un timer que quedó abierto. Quedaron registradas ${worked} hasta la última señal.`);
       queryClient.invalidateQueries({ queryKey: ["active-session"] });
       queryClient.invalidateQueries({ queryKey: ["task-sessions"] });
       queryClient.invalidateQueries({ queryKey: ["project-sessions"] });
@@ -108,20 +112,35 @@ export function useTimerLifecycle({
     let disposed = false;
 
     void (async () => {
-      const { getCurrentWindow } = await import("@tauri-apps/api/window");
-      const appWindow = getCurrentWindow();
-      const stop = await appWindow.onCloseRequested(async (event) => {
-        event.preventDefault();
-        try {
-          await api.stopActiveTimer();
-        } catch {
-          // Si no se pudo guardar (sin red), el latido caducado lo cerrará
-          // igual la próxima vez que se abra la app.
-        }
-        await appWindow.destroy();
-      });
-      if (disposed) stop();
-      else unlisten = stop;
+      try {
+        const { getCurrentWindow } = await import("@tauri-apps/api/window");
+        const appWindow = getCurrentWindow();
+        const stop = await appWindow.onCloseRequested(async (event) => {
+          event.preventDefault();
+          try {
+            await api.stopActiveTimer();
+          } catch {
+            // Si no se pudo guardar (sin red), el latido caducado lo cerrará
+            // igual la próxima vez que se abra la app.
+          }
+          // destroy() va fuera del try de arriba a propósito: si fallara, la
+          // ventana se quedaría sin cerrar y la app parecería colgada.
+          try {
+            await appWindow.destroy();
+          } catch {
+            window.close();
+          }
+        });
+        if (disposed) stop();
+        else unlisten = stop;
+      } catch (err) {
+        // Registrar el handler puede fallar (permiso de capabilities ausente,
+        // API de ventana no disponible). Sin este catch quedaba una promesa
+        // rechazada sin manejar en pleno arranque. El timer pierde el cierre
+        // limpio, no la app: el latido caducado sigue siendo la red de
+        // seguridad.
+        console.warn("No se pudo registrar el cierre limpio del timer:", err);
+      }
     })();
 
     return () => {

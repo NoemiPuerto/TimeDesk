@@ -1,11 +1,14 @@
 import { useEffect, useRef } from "react";
 import { AvatarUpload } from "../../components/Avatar";
+import { ErrorBoundary, SectionErrorFallback } from "../../components/ErrorBoundary";
 import { UpdateBanner } from "../../components/UpdateBanner";
-import { BarChartIcon, ClockIcon, GridIcon, KanbanIcon, LogOutIcon, SettingsIcon } from "../../components/icons";
+import { BarChartIcon, ClockIcon, FolderIcon, GridIcon, KanbanIcon, LogOutIcon, SettingsIcon } from "../../components/icons";
 import { useAuth } from "../auth/AuthProvider";
 import { DashboardView } from "../dashboard/DashboardView";
 import { useMyProjects } from "../projects/hooks";
 import { MembersPanel } from "../projects/MembersPanel";
+import { AllProjectsView } from "../projects/AllProjectsView";
+import { ProjectChooser } from "../projects/ProjectChooser";
 import { ProjectSwitcher } from "../projects/ProjectSwitcher";
 import { SettingsView } from "../settings/SettingsView";
 import { useAppStore } from "../../store/useAppStore";
@@ -26,6 +29,7 @@ import { useMyTeams, useTeamProjects } from "../teams/hooks";
 
 const NAV_ITEMS = [
   { key: "dashboard", label: "Dashboard", icon: GridIcon },
+  { key: "projects", label: "Projects", icon: FolderIcon },
   { key: "timer", label: "Timer", icon: ClockIcon },
   { key: "tasks", label: "Tasks", icon: KanbanIcon },
   { key: "analytics", label: "Analytics", icon: BarChartIcon },
@@ -160,7 +164,11 @@ export function AppLayout() {
       <main className="ml-64 flex-1 flex flex-col min-h-screen">
         <header className="sticky top-0 w-full flex justify-between items-center px-6 h-16 bg-surface-container-low/80 backdrop-blur-sm border-b border-outline-variant/20 z-30">
           <h2 className="text-sm font-medium text-on-surface truncate">
-            {activeNav === "dashboard" ? "Dashboard" : (selectedProject?.name ?? selectedTeam?.name ?? "TimeDesk")}
+            {activeNav === "dashboard"
+              ? "Dashboard"
+              : activeNav === "projects"
+                ? "Proyectos"
+                : (selectedProject?.name ?? selectedTeam?.name ?? "TimeDesk")}
           </h2>
           <div className="flex items-center gap-4">
             {user && <NotificationBell userId={user.id} onOpenProject={handleOpenProjectById} />}
@@ -197,46 +205,41 @@ export function AppLayout() {
                 <DashboardView userId={user.id} onOpenProject={handleOpenProject} />
               )}
 
-              {activeNav !== "dashboard" && (
+              {activeNav === "projects" && user && <AllProjectsView userId={user.id} />}
+
+              {activeNav !== "dashboard" && activeNav !== "projects" && (
                 <>
                   {isLoading && <p className="text-on-surface-variant text-sm">Cargando proyectos...</p>}
 
-                  {/* La configuración del equipo no necesita un proyecto elegido: sin
-                      esta salvedad, los avisos de abajo taparían la única pantalla
-                      desde donde se administra el equipo. */}
-                  {activeNav !== "settings" && !isLoading && selectedTeamId && (teamProjects ?? []).length === 0 && (
-                    <p className="text-on-surface-variant text-sm">
-                      Este equipo todavía no tiene proyectos. Usa el selector de arriba a la izquierda para crear uno.
-                    </p>
-                  )}
-
-                  {activeNav !== "settings" &&
-                    !isLoading &&
-                    selectedTeamId &&
-                    (teamProjects ?? []).length > 0 &&
-                    !selectedProject && (
-                      <p className="text-on-surface-variant text-sm">
-                        Elige un proyecto del equipo en el selector de arriba a la izquierda.
-                      </p>
-                    )}
-
-                  {activeNav !== "settings" && !isLoading && !selectedTeamId && !selectedProject && (
-                    <p className="text-on-surface-variant text-sm">
-                      Elige un proyecto en el selector de arriba a la izquierda.
-                    </p>
-                  )}
+                  {/* Sin proyecto elegido, la sección entera es la rejilla de
+                      tarjetas, que da lo necesario para decidir (actividad y
+                      quién participa) en vez de un desplegable a ciegas. Con
+                      proyecto elegido no se muestra ningún selector arriba: el
+                      cambio de proyecto se hace desde la barra lateral o desde
+                      la pestaña Projects. Settings queda fuera porque también
+                      configura el equipo, que no necesita proyecto elegido. */}
+                  {activeNav !== "settings" && !isLoading && !selectedProject && <ProjectChooser />}
 
                   {/* key por proyecto: sin esto, cambiar de proyecto reusa la misma
                       instancia y el estado local (columna destino, filtros, tarea
                       abierta) se arrastra del proyecto anterior. */}
                   {!isLoading && selectedProject && activeNav === "timer" && (
-                    <div className="space-y-8">
-                      <TimerSection
-                        key={selectedProject.id}
-                        projectId={selectedProject.id}
-                        projectName={selectedProject.name}
-                      />
-                      <TaskBoardArea key={selectedProject.id} projectId={selectedProject.id} boardOnly />
+                    /* La key va en el CONTENEDOR, no en cada hijo: así el
+                       subárbol entero se desmonta y se vuelve a montar de una
+                       pieza al cambiar de proyecto, sin ningún estado
+                       intermedio en el que puedan convivir dos proyectos. */
+                    <div key={selectedProject.id} className="space-y-8">
+                      {/* El timer va aislado: si su render falla, el resto
+                          de la vista (tablero incluido) sigue en pie. */}
+                      <ErrorBoundary
+                        label="TimerSection"
+                        fallback={(retry) => (
+                          <SectionErrorFallback title="El cronómetro no se pudo cargar." retry={retry} />
+                        )}
+                      >
+                        <TimerSection projectId={selectedProject.id} projectName={selectedProject.name} />
+                      </ErrorBoundary>
+                      <TaskBoardArea projectId={selectedProject.id} boardOnly />
                     </div>
                   )}
 

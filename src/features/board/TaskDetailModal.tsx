@@ -7,7 +7,10 @@ import { useProjectMembers } from "../projects/hooks";
 import { getAttachmentDownloadUrl, MAX_ATTACHMENT_SIZE } from "./attachments";
 import { formatBytes } from "./attachmentUtils";
 import type { Priority, Task } from "./api";
-import { DueDatePicker } from "./DueDatePicker";
+import { CommentBody } from "./CommentBody";
+import { DatePicker } from "./DatePicker";
+import { MentionTextarea } from "./MentionTextarea";
+import { displayToStorage } from "./mentions";
 import {
   useAddTaskAssignee,
   useAddTaskTag,
@@ -55,6 +58,8 @@ export function TaskDetailModal({
   const tagPickerRef = useDismissable(tagPickerOpen, () => setTagPickerOpen(false));
   const assigneePickerRef = useDismissable(assigneePickerOpen, () => setAssigneePickerOpen(false));
   const [newComment, setNewComment] = useState("");
+  /** A quién se eligió del autocompletado, para resolver los nombres al enviar. */
+  const [commentMentions, setCommentMentions] = useState<{ name: string; userId: string }[]>([]);
   const [newSubtaskTitle, setNewSubtaskTitle] = useState("");
   const [attachmentError, setAttachmentError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -84,6 +89,14 @@ export function TaskDetailModal({
   const addAssignee = useAddTaskAssignee(projectId);
   const removeAssignee = useRemoveTaskAssignee(projectId);
 
+  /** Candidatos a mención: los miembros del proyecto, que son quienes pueden leer el comentario. */
+  const mentionCandidates = (members ?? []).map((m) => ({
+    userId: m.user_id,
+    name: m.profile.display_name,
+    avatarUrl: m.profile.avatar_url,
+  }));
+  const memberNamesById = new Map((members ?? []).map((m) => [m.user_id, m.profile.display_name]));
+
   const taskTags = taskTagsMap?.get(task.id) ?? [];
   const taskAssignees = taskAssigneesMap?.get(task.id) ?? [];
   const availableTags = (allTags ?? []).filter((t) => !taskTags.some((tt) => tt.id === t.id));
@@ -111,6 +124,13 @@ export function TaskDetailModal({
     updateDetails.mutate({ taskId: task.id, details: { due_date: value } });
   }
 
+  // El inicio no se puede vaciar: la columna es NOT NULL y el Gantt cuenta
+  // con que toda tarea arranca en algún día.
+  function setStartDate(value: string | null) {
+    if (!value) return;
+    updateDetails.mutate({ taskId: task.id, details: { start_date: value } });
+  }
+
   async function handleCreateTag(e: FormEvent) {
     e.preventDefault();
     const name = newTagName.trim();
@@ -127,12 +147,17 @@ export function TaskDetailModal({
     onClose();
   }
 
-  function handleAddComment(e: FormEvent) {
-    e.preventDefault();
-    const body = newComment.trim();
-    if (!body) return;
-    createComment.mutate(body);
+  // El evento es opcional: el envío también llega desde la tecla Enter del
+  // MentionTextarea, que no dispara el submit del formulario.
+  function handleAddComment(e?: FormEvent) {
+    e?.preventDefault();
+    const visible = newComment.trim();
+    if (!visible) return;
+    // Lo que se ve es "@Nombre"; lo que se guarda lleva el id de cada persona
+    // que se eligió de la lista de autocompletado.
+    createComment.mutate(displayToStorage(visible, commentMentions));
     setNewComment("");
+    setCommentMentions([]);
   }
 
   function handleAddSubtask(e: FormEvent) {
@@ -230,9 +255,16 @@ export function TaskDetailModal({
 
           <div className="flex flex-col gap-2">
             <label className="text-xs font-bold uppercase tracking-widest text-on-surface-variant">
+              Inicio
+            </label>
+            <DatePicker value={task.start_date} onChange={setStartDate} clearable={false} />
+          </div>
+
+          <div className="flex flex-col gap-2">
+            <label className="text-xs font-bold uppercase tracking-widest text-on-surface-variant">
               Fecha límite
             </label>
-            <DueDatePicker value={task.due_date} onChange={setDueDate} />
+            <DatePicker value={task.due_date} onChange={setDueDate} />
           </div>
         </div>
 
@@ -508,24 +540,22 @@ export function TaskDetailModal({
                       </button>
                     )}
                   </div>
-                  <p className="text-sm text-on-surface whitespace-pre-wrap break-words">{c.body}</p>
+                  <CommentBody body={c.body} currentUserId={user?.id} namesById={memberNamesById} />
                 </div>
               </div>
             ))}
           </div>
 
           <form onSubmit={handleAddComment} className="flex items-end gap-2">
-            <textarea
-              className="flex-1 bg-surface-container-lowest border border-outline-variant/30 rounded-md px-3 py-2 text-sm text-on-surface focus:outline-none focus:ring-2 focus:ring-primary-container min-h-[40px] resize-none"
-              placeholder="Escribe un comentario..."
+            <MentionTextarea
+              className="w-full bg-surface-container-lowest border border-outline-variant/30 rounded-md px-3 py-2 text-sm text-on-surface focus:outline-none focus:ring-2 focus:ring-primary-container min-h-[40px] resize-none"
+              placeholder="Escribe un comentario... usa @ para mencionar"
               value={newComment}
-              onChange={(e) => setNewComment(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" && !e.shiftKey) {
-                  e.preventDefault();
-                  handleAddComment(e as unknown as FormEvent);
-                }
-              }}
+              onChange={setNewComment}
+              onSubmit={() => handleAddComment()}
+              onMentionInsert={(m) => setCommentMentions((prev) => [...prev, m])}
+              mentions={commentMentions}
+              candidates={mentionCandidates}
             />
             <button
               type="submit"

@@ -102,6 +102,11 @@ export function useUserRealtime(userId: string | null) {
       )
       .on(
         "postgres_changes",
+        { event: "*", schema: "public", table: "event_attendees", filter: `user_id=eq.${userId}` },
+        () => queryClient.invalidateQueries({ queryKey: ["events"] }),
+      )
+      .on(
+        "postgres_changes",
         { event: "*", schema: "public", table: "team_members", filter: `user_id=eq.${userId}` },
         () => {
           queryClient.invalidateQueries({ queryKey: ["teams"] });

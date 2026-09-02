@@ -19,13 +19,14 @@ export type Invitation = {
 
 export type AppNotification = {
   id: string;
-  type: "mention";
+  type: "mention" | "event_invite";
   project_id: string | null;
   task_id: string | null;
   comment_id: string | null;
   actor_id: string | null;
   body: string | null;
   task_title: string | null;
+  event_id: string | null;
   read_at: string | null;
   created_at: string;
   actor: { display_name: string; avatar_url: string | null } | null;
@@ -89,7 +90,7 @@ export async function listNotifications(userId: string): Promise<AppNotification
   const { data, error } = await supabase
     .from("notifications")
     .select(
-      "id, type, project_id, task_id, comment_id, actor_id, body, task_title, read_at, created_at," +
+      "id, type, project_id, task_id, comment_id, actor_id, body, task_title, event_id, read_at, created_at," +
         " actor:profiles!notifications_actor_id_fkey(display_name, avatar_url)",
     )
     .eq("user_id", userId)

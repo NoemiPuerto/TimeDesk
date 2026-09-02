@@ -260,11 +260,84 @@ export type Database = {
           },
         ]
       }
+      event_attendees: {
+        Row: { event_id: string; user_id: string }
+        Insert: { event_id: string; user_id: string }
+        Update: { event_id?: string; user_id?: string }
+        Relationships: [
+          {
+            foreignKeyName: "event_attendees_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "events"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "event_attendees_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      events: {
+        Row: {
+          category: string | null
+          created_at: string
+          created_by: string
+          duration_minutes: number
+          id: string
+          recurrence: string
+          starts_at: string
+          team_id: string
+          title: string
+        }
+        Insert: {
+          category?: string | null
+          created_at?: string
+          created_by: string
+          duration_minutes: number
+          id?: string
+          recurrence?: string
+          starts_at: string
+          team_id: string
+          title: string
+        }
+        Update: {
+          category?: string | null
+          created_at?: string
+          created_by?: string
+          duration_minutes?: number
+          id?: string
+          recurrence?: string
+          starts_at?: string
+          team_id?: string
+          title?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "events_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "events_team_id_fkey"
+            columns: ["team_id"]
+            isOneToOne: false
+            referencedRelation: "teams"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       notifications: {
         Row: {
           actor_id: string | null
           body: string | null
           comment_id: string | null
+          event_id: string | null
           created_at: string
           id: string
           project_id: string | null
@@ -278,6 +351,7 @@ export type Database = {
           actor_id?: string | null
           body?: string | null
           comment_id?: string | null
+          event_id?: string | null
           created_at?: string
           id?: string
           project_id?: string | null
@@ -291,6 +365,7 @@ export type Database = {
           actor_id?: string | null
           body?: string | null
           comment_id?: string | null
+          event_id?: string | null
           created_at?: string
           id?: string
           project_id?: string | null
@@ -400,6 +475,8 @@ export type Database = {
       }
       projects: {
         Row: {
+          category: string | null
+          cover_url: string | null
           created_at: string
           description: string | null
           done_display_limit: number | null
@@ -420,6 +497,8 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          category?: string | null
+          cover_url?: string | null
           created_at?: string
           description?: string | null
           done_display_limit?: number | null
@@ -598,6 +677,7 @@ export type Database = {
           position: number
           priority: string | null
           project_id: string
+          start_date: string
           title: string
           updated_at: string
         }
@@ -612,6 +692,7 @@ export type Database = {
           position?: number
           priority?: string | null
           project_id: string
+          start_date?: string
           title: string
           updated_at?: string
         }
@@ -626,6 +707,7 @@ export type Database = {
           position?: number
           priority?: string | null
           project_id?: string
+          start_date?: string
           title?: string
           updated_at?: string
         }
@@ -849,6 +931,8 @@ export type Database = {
       create_project: {
         Args: { p_description?: string; p_name: string; p_team_id?: string }
         Returns: {
+          category: string | null
+          cover_url: string | null
           created_at: string
           description: string | null
           done_display_limit: number | null
@@ -900,7 +984,7 @@ export type Database = {
         }
       }
       create_task: {
-        Args: { p_column_id: string; p_project_id: string; p_title: string }
+        Args: { p_column_id: string; p_project_id: string; p_start_date?: string; p_title: string }
         Returns: {
           column_id: string
           completed_at: string | null
@@ -912,6 +996,7 @@ export type Database = {
           position: number
           priority: string | null
           project_id: string
+          start_date: string
           title: string
           updated_at: string
         }
@@ -937,6 +1022,38 @@ export type Database = {
           isOneToOne: true
           isSetofReturn: false
         }
+      }
+      create_event: {
+        Args: {
+          p_attendee_ids: string[]
+          p_category?: string
+          p_duration_minutes: number
+          p_recurrence?: string
+          p_starts_at: string
+          p_team_id: string
+          p_title: string
+        }
+        Returns: {
+          category: string | null
+          created_at: string
+          created_by: string
+          duration_minutes: number
+          id: string
+          recurrence: string
+          starts_at: string
+          team_id: string
+          title: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "events"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      is_event_attendee: {
+        Args: { p_event_id: string; p_user_id: string }
+        Returns: boolean
       }
       close_stale_timer: {
         Args: { p_stale_seconds?: number }
@@ -1049,6 +1166,8 @@ export type Database = {
       list_team_projects: {
         Args: { p_team_id: string }
         Returns: {
+          category: string
+          cover_url: string
           created_at: string
           description: string
           done_display_limit: number | null

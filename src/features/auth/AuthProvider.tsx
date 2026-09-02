@@ -18,9 +18,13 @@ type AuthContextValue = {
 /**
  * TimeDesk es una app de escritorio sin dominio web propio ni deep-link, así
  * que el enlace del email de recuperación no puede "volver" a la ventana de la
- * app. En vez de eso, la persona trae el token a mano: o el código de 6 dígitos
- * ({{ .Token }} en la plantilla de email de Supabase) o el enlace completo
- * copiado del email, del que sacamos el token acá.
+ * app. Por eso el flujo es de CÓDIGO: la plantilla de Supabase manda
+ * `{{ .Token }}` —seis dígitos— y la persona lo escribe aquí.
+ *
+ * Se sigue aceptando un enlace pegado, aunque la interfaz no lo ofrezca: hay
+ * emails antiguos con el formato viejo circulando hasta que caducan, y esto los
+ * rescata sin coste. En cuanto la plantilla nueva esté puesta, esta rama deja
+ * de usarse sola.
  */
 function extractRecoveryToken(input: string): { token?: string; tokenHash?: string; accessToken?: string; refreshToken?: string } {
   const trimmed = input.trim();
@@ -42,6 +46,24 @@ function extractRecoveryToken(input: string): { token?: string; tokenHash?: stri
   // El enlace tal cual viene del email: /auth/v1/verify?token=<hash>&type=recovery
   const tokenHash = url.searchParams.get("token_hash") ?? url.searchParams.get("token") ?? undefined;
   return { tokenHash };
+}
+
+/**
+ * Traduce los errores de Supabase a algo que se pueda accionar.
+ *
+ * Los suyos vienen en inglés y describen el mecanismo ("Token has expired or is
+ * invalid"), no qué hacer. Se conserva el original cuando no se reconoce, para
+ * no esconder un fallo distinto detrás de un texto genérico.
+ */
+function recoveryErrorMessage(raw: string): string {
+  const message = raw.toLowerCase();
+  if (message.includes("expired") || message.includes("invalid")) {
+    return "El código no es válido o ya caducó. Pide uno nuevo.";
+  }
+  if (message.includes("rate limit") || message.includes("too many")) {
+    return "Demasiados intentos seguidos. Espera un minuto y vuelve a probar.";
+  }
+  return raw;
 }
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
@@ -100,7 +122,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         access_token: parsed.accessToken,
         refresh_token: parsed.refreshToken,
       });
-      if (error) return { error: error.message };
+      if (error) return { error: recoveryErrorMessage(error.message) };
       setPasswordRecovery(true);
       return { error: null };
     }
@@ -109,7 +131,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       ? await supabase.auth.verifyOtp({ token_hash: parsed.tokenHash, type: "recovery" })
       : await supabase.auth.verifyOtp({ email, token: parsed.token ?? "", type: "recovery" });
 
-    if (error) return { error: error.message };
+    if (error) return { error: recoveryErrorMessage(error.message) };
     // verifyOtp emite SIGNED_IN, no PASSWORD_RECOVERY: lo marcamos a mano para
     // que la pantalla siguiente sea "elige una contraseña nueva" y no la app.
     setPasswordRecovery(true);

@@ -38,7 +38,7 @@ export function useInviteMember(projectId: string | null) {
 export function useUpdateProject(projectId: string | null) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (details: { name?: string; description?: string | null; done_display_limit?: number | null }) =>
+    mutationFn: (details: Parameters<typeof api.updateProject>[1]) =>
       api.updateProject(projectId as string, details),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["projects"] });
@@ -69,5 +69,21 @@ export function useRemoveMember(projectId: string | null) {
       queryClient.invalidateQueries({ queryKey: ["projects"] });
       queryClient.invalidateQueries({ queryKey: ["team-projects"] });
     },
+  });
+}
+
+export function useMembersForProjects(projectIds: string[]) {
+  return useQuery({
+    queryKey: ["project-members", "batch", projectIds],
+    queryFn: () => api.listMembersForProjects(projectIds),
+    enabled: projectIds.length > 0,
+  });
+}
+
+export function useLastActivityForProjects(projectIds: string[]) {
+  return useQuery({
+    queryKey: ["project-last-activity", projectIds],
+    queryFn: () => api.listLastActivityForProjects(projectIds),
+    enabled: projectIds.length > 0,
   });
 }

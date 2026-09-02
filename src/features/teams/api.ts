@@ -20,6 +20,8 @@ export type TeamProject = {
   id: string;
   name: string;
   description: string | null;
+  cover_url: string | null;
+  category: string | null;
   team_id: string;
   owner_id: string;
   created_at: string;

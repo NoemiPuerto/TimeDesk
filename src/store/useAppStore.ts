@@ -1,7 +1,7 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 
-export type NavKey = "dashboard" | "timer" | "tasks" | "analytics" | "settings";
+export type NavKey = "dashboard" | "projects" | "timer" | "tasks" | "analytics" | "settings";
 
 type AppState = {
   selectedProjectId: string | null;
@@ -20,17 +20,40 @@ type AppState = {
    */
   openTaskId: string | null;
   requestOpenTask: (taskId: string | null) => void;
+  /**
+   * Último proyecto elegido en cada ámbito ("personal" o el id del equipo).
+   *
+   * Cambiar de equipo tiene que limpiar el proyecto —uno del equipo A no vale
+   * en el B—, pero volver al equipo anterior debería devolverte donde estabas
+   * en vez de dejarte otra vez en "elige un proyecto".
+   */
+  lastProjectByScope: Record<string, string>;
 };
+
+function scopeKey(teamId: string | null): string {
+  return teamId ?? "personal";
+}
 
 export const useAppStore = create<AppState>()(
   persist(
     (set) => ({
       selectedProjectId: null,
-      selectProject: (id) => set({ selectedProjectId: id }),
+      lastProjectByScope: {},
+      selectProject: (id) =>
+        set((state) => ({
+          selectedProjectId: id,
+          lastProjectByScope: id
+            ? { ...state.lastProjectByScope, [scopeKey(state.selectedTeamId)]: id }
+            : state.lastProjectByScope,
+        })),
       focusedTaskId: null,
       setFocusedTaskId: (id) => set({ focusedTaskId: id }),
       selectedTeamId: null,
-      selectTeam: (id) => set({ selectedTeamId: id, selectedProjectId: null }),
+      selectTeam: (id) =>
+        set((state) => ({
+          selectedTeamId: id,
+          selectedProjectId: state.lastProjectByScope[scopeKey(id)] ?? null,
+        })),
       activeNav: "dashboard",
       setActiveNav: (nav) => set({ activeNav: nav }),
       openTaskId: null,
@@ -44,6 +67,7 @@ export const useAppStore = create<AppState>()(
       partialize: (state) => ({
         selectedProjectId: state.selectedProjectId,
         selectedTeamId: state.selectedTeamId,
+        lastProjectByScope: state.lastProjectByScope,
       }),
     },
   ),

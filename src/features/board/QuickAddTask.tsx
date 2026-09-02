@@ -1,8 +1,9 @@
 import { useState, type FormEvent, type KeyboardEvent } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { PlusIcon, SlidersIcon } from "../../components/icons";
+import { toDateKey } from "../analytics/utils";
 import type { Column, Priority } from "./api";
-import { DueDatePicker } from "./DueDatePicker";
+import { DatePicker } from "./DatePicker";
 import { useCreateTask, useUpdateTaskDetails } from "./hooks";
 import * as subtasksApi from "./subtasks";
 
@@ -17,6 +18,9 @@ export function QuickAddTask({ projectId, columns }: { projectId: string; column
   const [columnId, setColumnId] = useState("");
   const [expanded, setExpanded] = useState(false);
   const [priority, setPriority] = useState<Priority | null>(null);
+  // Hoy en hora LOCAL: es la fecha que se manda al crear, y la que se ve si
+  // se abre "Más opciones" sin tocar nada.
+  const [startDate, setStartDate] = useState<string>(() => toDateKey(new Date()));
   const [dueDate, setDueDate] = useState<string | null>(null);
   const [subtaskDrafts, setSubtaskDrafts] = useState<string[]>([]);
   const [subtaskInput, setSubtaskInput] = useState("");
@@ -57,7 +61,11 @@ export function QuickAddTask({ projectId, columns }: { projectId: string; column
     const trimmedTitle = title.trim();
     if (!trimmedTitle || !effectiveColumnId) return;
 
-    const task = await createTask.mutateAsync({ columnId: effectiveColumnId, title: trimmedTitle });
+    const task = await createTask.mutateAsync({
+      columnId: effectiveColumnId,
+      title: trimmedTitle,
+      startDate,
+    });
 
     if (priority || dueDate) {
       await updateDetails.mutateAsync({ taskId: task.id, details: { priority, due_date: dueDate } });
@@ -72,6 +80,7 @@ export function QuickAddTask({ projectId, columns }: { projectId: string; column
 
     setTitle("");
     setPriority(null);
+    setStartDate(toDateKey(new Date()));
     setDueDate(null);
     setSubtaskDrafts([]);
     setSubtaskInput("");
@@ -150,11 +159,22 @@ export function QuickAddTask({ projectId, columns }: { projectId: string; column
           </div>
 
           <div className="flex flex-col gap-2">
+            <span className="text-xs font-bold uppercase tracking-widest text-on-surface-variant">Inicio</span>
+            <div className="w-36">
+              <DatePicker
+                value={startDate}
+                onChange={(v) => setStartDate(v ?? toDateKey(new Date()))}
+                clearable={false}
+              />
+            </div>
+          </div>
+
+          <div className="flex flex-col gap-2">
             <span className="text-xs font-bold uppercase tracking-widest text-on-surface-variant">
               Fecha límite
             </span>
             <div className="w-36">
-              <DueDatePicker value={dueDate} onChange={setDueDate} />
+              <DatePicker value={dueDate} onChange={setDueDate} />
             </div>
           </div>
 

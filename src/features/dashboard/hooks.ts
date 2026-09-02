@@ -32,3 +32,11 @@ export function useDashboardSessions(projectIds: string[], since: string) {
     enabled: projectIds.length > 0,
   });
 }
+
+export function useMyAssignedTaskIds(userId: string | null, projectIds: string[]) {
+  return useQuery({
+    queryKey: ["dashboard-assigned", userId, projectIds],
+    queryFn: () => api.listMyAssignedTaskIds(userId as string, projectIds),
+    enabled: !!userId && projectIds.length > 0,
+  });
+}

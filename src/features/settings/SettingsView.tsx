@@ -223,7 +223,7 @@ export function SettingsView({ project, team }: { project: Project | null; team:
   if (!project && !team) {
     return (
       <p className="text-on-surface-variant text-sm">
-        Elige un equipo o un proyecto en el selector de arriba a la izquierda para configurarlo.
+        Elige un equipo o un proyecto en la barra lateral para configurarlo.
       </p>
     );
   }

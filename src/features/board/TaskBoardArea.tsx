@@ -71,7 +71,7 @@ export function TaskBoardArea({
           </div>
 
           {view !== "overview" && view !== "files" && view !== "history" && (
-            <TaskToolbar columns={columns ?? []} filters={filters} onChange={setFilters} />
+            <TaskToolbar projectId={projectId} columns={columns ?? []} filters={filters} onChange={setFilters} />
           )}
         </>
       )}
@@ -84,9 +84,9 @@ export function TaskBoardArea({
           projectId={projectId}
           onOpenTask={setDetailTaskId}
           filters={boardOnly ? undefined : filters}
-          // En el Timer el tablero es solo lo de esta semana; el límite de Done
-          // es cosa de la pestaña Board.
-          recentOnly={boardOnly}
+          // En el Timer el tablero es solo la ventana de 7 días, ordenado por
+          // urgencia; el límite de Done es cosa de la pestaña Board.
+          timerMode={boardOnly}
           doneDisplayLimit={boardOnly ? null : doneDisplayLimit}
           onShowHistory={boardOnly ? undefined : () => setView("history")}
         />

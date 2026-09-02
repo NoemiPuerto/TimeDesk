@@ -1,5 +1,7 @@
+import { useMemo } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import * as api from "./api";
+import { timerWindow } from "./urgency";
 import * as tagsApi from "./tags";
 import * as assigneesApi from "./assignees";
 import * as commentsApi from "./comments";
@@ -18,6 +20,29 @@ export function useTasks(projectId: string | null) {
   return useQuery({
     queryKey: ["tasks", projectId],
     queryFn: () => api.listTasks(projectId as string),
+    enabled: !!projectId,
+  });
+}
+
+/**
+ * Tareas del tablero del Timer: solo la ventana hoy..hoy+6 (más vencidas y sin
+ * fecha), filtradas en la consulta.
+ *
+ * La clave empieza por ["tasks", projectId] a propósito: react-query invalida
+ * por prefijo, así que cualquier `invalidateQueries(["tasks", projectId])` que
+ * ya existía refresca también esta lista sin tocar nada más.
+ *
+ * La ventana se calcula al montar. Si la app se deja abierta cruzando la
+ * medianoche, sigue mostrando la de ayer hasta que se vuelva a montar la vista:
+ * asumido, no vale la pena un temporizador solo para eso.
+ */
+export function useTimerTasks(projectId: string | null) {
+  const { endKey, todayStart } = useMemo(() => timerWindow(), []);
+  const todayStartIso = todayStart.toISOString();
+
+  return useQuery({
+    queryKey: ["tasks", projectId, "timer-window", endKey],
+    queryFn: () => api.listTimerTasks(projectId as string, endKey, todayStartIso),
     enabled: !!projectId,
   });
 }
@@ -76,8 +101,8 @@ export function useReorderColumns(projectId: string | null) {
 export function useCreateTask(projectId: string | null) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ columnId, title }: { columnId: string; title: string }) =>
-      api.createTask(projectId as string, columnId, title),
+    mutationFn: ({ columnId, title, startDate }: { columnId: string; title: string; startDate: string }) =>
+      api.createTask(projectId as string, columnId, title, startDate),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["tasks", projectId] }),
   });
 }
@@ -108,6 +133,15 @@ export function useReorderTasks(projectId: string | null) {
     onError: (_err, _vars, context) => {
       if (context?.previous) queryClient.setQueryData(["tasks", projectId], context.previous);
     },
+    onSettled: () => queryClient.invalidateQueries({ queryKey: ["tasks", projectId] }),
+  });
+}
+
+export function useMoveTaskToColumn(projectId: string | null) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ taskId, columnId }: { taskId: string; columnId: string }) =>
+      api.moveTaskToColumn(taskId, columnId),
     onSettled: () => queryClient.invalidateQueries({ queryKey: ["tasks", projectId] }),
   });
 }

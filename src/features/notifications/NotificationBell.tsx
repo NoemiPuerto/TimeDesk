@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Avatar } from "../../components/Avatar";
 import { BellIcon } from "../../components/icons";
 import { useDismissable } from "../../lib/useDismissable";
+import { mentionsToPlainText } from "../board/mentions";
 import { useAppStore } from "../../store/useAppStore";
 import type { AppNotification, Invitation } from "./api";
 import {
@@ -100,6 +101,11 @@ export function NotificationBell({
 
   function handleOpenNotification(n: AppNotification) {
     if (!n.read_at) markRead.mutate(n.id);
+    // Los eventos viven en el Dashboard, no dentro de un proyecto.
+    if (n.type === "event_invite") {
+      setOpen(false);
+      return;
+    }
     if (n.project_id) {
       // La tarea se abre después, cuando el tablero del proyecto ya montó.
       requestOpenTask(n.task_id);
@@ -151,10 +157,10 @@ export function NotificationBell({
           )}
 
           <div className="flex flex-col gap-2">
-            <p className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">Menciones</p>
+            <p className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">Avisos</p>
             {(notifications ?? []).length === 0 ? (
               <p className="text-xs text-on-surface-variant bg-surface-container rounded-md p-3">
-                Cuando alguien escriba @tu-nombre en un comentario, aparecerá aquí.
+                Aquí aparecerán las menciones en comentarios y los eventos a los que te inviten.
               </p>
             ) : (
               <ul className="flex flex-col gap-1">
@@ -176,10 +182,19 @@ export function NotificationBell({
                       />
                       <span className="min-w-0 flex-1">
                         <span className="block text-[11px] text-on-surface">
-                          <span className="font-bold">{n.actor?.display_name ?? "Alguien"}</span> te mencionó en{" "}
-                          <span className="font-bold">{n.task_title ?? "una tarea"}</span>
+                          <span className="font-bold">{n.actor?.display_name ?? "Alguien"}</span>
+                          {n.type === "event_invite" ? (
+                            <> te invitó a un evento</>
+                          ) : (
+                            <>
+                              {" "}
+                              te mencionó en <span className="font-bold">{n.task_title ?? "una tarea"}</span>
+                            </>
+                          )}
                         </span>
-                        <span className="block text-[11px] text-on-surface-variant line-clamp-2 mt-0.5">{n.body}</span>
+                        <span className="block text-[11px] text-on-surface-variant line-clamp-2 mt-0.5">
+                          {mentionsToPlainText(n.body ?? "")}
+                        </span>
                         <span className="block text-[10px] text-on-surface-variant/70 mt-0.5">
                           {relativeTime(n.created_at)}
                         </span>

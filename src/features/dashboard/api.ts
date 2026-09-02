@@ -1,13 +1,13 @@
 import { supabase } from "../../lib/supabase";
-import type { Project } from "../projects/api";
-import type { Column, Task } from "../board/api";
+import { PROJECT_COLUMNS, type Project } from "../projects/api";
+import { TASK_COLUMNS, type Column, type Task } from "../board/api";
 import type { TimeSession } from "../timer/api";
 
 /** Every project the caller is an actual member of — personal or team-assigned, not just visible. */
 export async function listAccessibleProjects(userId: string): Promise<Project[]> {
   const { data, error } = await supabase
     .from("project_members")
-    .select("project:projects(id, name, description, owner_id, team_id, created_at, done_display_limit)")
+    .select(`project:projects(${PROJECT_COLUMNS})`)
     .eq("user_id", userId);
   if (error) throw error;
   return (data as unknown as { project: Project }[]).map((row) => row.project);
@@ -17,7 +17,7 @@ export async function listTasksForProjects(projectIds: string[]): Promise<Task[]
   if (projectIds.length === 0) return [];
   const { data, error } = await supabase
     .from("tasks")
-    .select("id, project_id, column_id, title, description, priority, due_date, position, created_at, completed_at")
+    .select(TASK_COLUMNS)
     .in("project_id", projectIds);
   if (error) throw error;
   return data as Task[];
@@ -32,6 +32,20 @@ export async function listColumnsForProjects(projectIds: string[]): Promise<Colu
     .order("position", { ascending: true });
   if (error) throw error;
   return data;
+}
+
+/** Ids de las tareas asignadas a esta persona dentro de los proyectos dados. */
+export async function listMyAssignedTaskIds(userId: string, projectIds: string[]): Promise<Set<string>> {
+  if (projectIds.length === 0) return new Set();
+  // task_assignees no guarda project_id: se acota con un join interno a tasks,
+  // igual que hace listAllTaskAssignees.
+  const { data, error } = await supabase
+    .from("task_assignees")
+    .select("task_id, task:tasks!inner(project_id)")
+    .eq("user_id", userId)
+    .in("task.project_id", projectIds);
+  if (error) throw error;
+  return new Set((data as unknown as { task_id: string }[]).map((row) => row.task_id));
 }
 
 export async function listSessionsForProjects(projectIds: string[], since: string): Promise<TimeSession[]> {

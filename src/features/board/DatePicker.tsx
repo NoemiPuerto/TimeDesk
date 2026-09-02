@@ -30,12 +30,18 @@ function parseDateKey(key: string): Date {
   return new Date(y, m - 1, d);
 }
 
-export function DueDatePicker({
+/**
+ * Selector de fecha. Lo usan la fecha de inicio y la fecha límite, de ahí el
+ * nombre genérico: `clearable={false}` para la de inicio, que es obligatoria.
+ */
+export function DatePicker({
   value,
   onChange,
+  clearable = true,
 }: {
   value: string | null;
   onChange: (value: string | null) => void;
+  clearable?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const selected = value ? parseDateKey(value) : null;
@@ -145,17 +151,23 @@ export function DueDatePicker({
             })}
           </div>
 
-          <div className="flex items-center justify-between mt-3 pt-2 border-t border-outline-variant/20">
-            <button
-              type="button"
-              onClick={() => {
-                onChange(null);
-                setOpen(false);
-              }}
-              className="text-xs text-on-surface-variant hover:text-error"
-            >
-              Borrar
-            </button>
+          <div
+            className={`flex items-center mt-3 pt-2 border-t border-outline-variant/20 ${
+              clearable ? "justify-between" : "justify-end"
+            }`}
+          >
+            {clearable && (
+              <button
+                type="button"
+                onClick={() => {
+                  onChange(null);
+                  setOpen(false);
+                }}
+                className="text-xs text-on-surface-variant hover:text-error"
+              >
+                Borrar
+              </button>
+            )}
             <button
               type="button"
               onClick={() => {

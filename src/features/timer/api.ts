@@ -11,10 +11,36 @@ export type TimeSession = {
   last_heartbeat_at: string;
 };
 
+/** Id del usuario actual, leído del storage local (no hace red, a diferencia de getUser). */
+async function currentUserId(): Promise<string | null> {
+  const { data } = await supabase.auth.getSession();
+  return data.session?.user?.id ?? null;
+}
+
+/**
+ * La sesión de timer abierta DEL USUARIO ACTUAL.
+ *
+ * El filtro por `user_id` es imprescindible y antes no estaba: la consulta se
+ * apoyaba solo en RLS, pero la política SELECT de `time_sessions` también
+ * entrega sesiones ajenas (proyecto personal compartido, o proyecto de equipo
+ * si eres admin). Con un compañero cronometrando a la vez, la consulta devolvía
+ * dos filas y `.maybeSingle()` reventaba con PGRST116 — el timer se quedaba
+ * muerto sin decir por qué. Además se pide `limit(1)`, así que ya no puede
+ * fallar por multiplicidad ni aunque el índice único desapareciera.
+ */
 export async function getActiveSession(): Promise<TimeSession | null> {
-  const { data, error } = await supabase.from("time_sessions").select("*").is("ended_at", null).maybeSingle();
+  const userId = await currentUserId();
+  if (!userId) return null;
+
+  const { data, error } = await supabase
+    .from("time_sessions")
+    .select("*")
+    .eq("user_id", userId)
+    .is("ended_at", null)
+    .order("started_at", { ascending: false })
+    .limit(1);
   if (error) throw error;
-  return data;
+  return data[0] ?? null;
 }
 
 export async function startTimer(taskId: string): Promise<TimeSession> {
@@ -40,6 +66,24 @@ export async function sendHeartbeat(): Promise<void> {
 }
 
 /**
+ * Una fila de RPC solo cuenta como sesión si trae los campos que la definen.
+ *
+ * Cuando una función que devuelve un tipo compuesto no encuentra nada, PostgREST
+ * responde con la fila entera a `null` campo por campo (`{id: null, started_at:
+ * null, ...}`) en vez de un `null` pelado. Ese objeto es *truthy*, así que
+ * atravesaba el `if (!closed)` y llegaba a la interfaz como si fuera una sesión
+ * real. Como `new Date(null).getTime()` es 0 —el epoch, no NaN—, el aviso
+ * anunciaba "496705:41:57": los años transcurridos desde 1970. Y como nunca
+ * había nada que cerrar, saltaba en cada arranque.
+ */
+function asSession(row: unknown): TimeSession | null {
+  if (!row || typeof row !== "object") return null;
+  const candidate = row as Partial<TimeSession>;
+  if (!candidate.id || !candidate.started_at) return null;
+  return candidate as TimeSession;
+}
+
+/**
  * Cierra la sesión abierta si dejó de latir (app cerrada, equipo suspendido o
  * apagado), usando el último latido como hora de fin. Devuelve la sesión que
  * cerró, o null si no había nada colgado.
@@ -47,19 +91,23 @@ export async function sendHeartbeat(): Promise<void> {
 export async function closeStaleTimer(staleSeconds: number): Promise<TimeSession | null> {
   const { data, error } = await supabase.rpc("close_stale_timer", { p_stale_seconds: staleSeconds });
   if (error) throw error;
-  return data as TimeSession | null;
+  return asSession(data);
 }
 
 /**
- * Detiene la sesión abierta del usuario sin necesitar su id — hace falta al
- * cerrar la app, donde puede no haber ningún componente con la sesión cargada.
- * El UPDATE no filtra por user_id porque la política RLS
- * "users can update their own time sessions" ya lo acota a las suyas.
+ * Detiene la sesión abierta del usuario. Hace falta al cerrar la app, donde
+ * puede no haber ningún componente con la sesión cargada. Filtra por `user_id`
+ * de forma explícita: la política RLS ya lo acota, pero dejarlo implícito es lo
+ * que hizo que `getActiveSession` tocara filas ajenas sin que se notara.
  */
 export async function stopActiveTimer(): Promise<void> {
+  const userId = await currentUserId();
+  if (!userId) return;
+
   const { error } = await supabase
     .from("time_sessions")
     .update({ ended_at: new Date().toISOString() })
+    .eq("user_id", userId)
     .is("ended_at", null);
   if (error) throw error;
 }
