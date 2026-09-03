@@ -88,20 +88,19 @@ function UpdatePasswordForm() {
 const RESEND_COOLDOWN_SECONDS = 60;
 
 /**
- * Recuperar contraseña: un código de 6 dígitos por email y, con él, la
- * contraseña nueva.
+ * Recuperar contraseña: se pide el email y se espera.
  *
- * El email NO lleva enlace a propósito (ver `supabase/templates/reset-password.html`):
- * TimeDesk no tiene dominio web, así que pulsarlo no llevaría a ninguna parte
- * y, peor, Supabase consumiría el token y dejaría el código inservible.
+ * No hay nada que copiar ni escribir. La persona abre el correo, pulsa el
+ * enlace, y el sistema devuelve el control a TimeDesk por el esquema
+ * `timedesk://` — `AuthProvider` recibe ese enlace, monta la sesión y la app
+ * pasa sola a la pantalla de contraseña nueva, incluso si estaba cerrada.
  */
 function ResetPasswordRequestForm({ onBack }: { onBack: () => void }) {
-  const { requestPasswordReset, verifyRecoveryCode } = useAuth();
+  const { requestPasswordReset, recoveryError } = useAuth();
   const [email, setEmail] = useState("");
-  const [code, setCode] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
-  const [step, setStep] = useState<"email" | "code">("email");
+  const [sent, setSent] = useState(false);
   const [cooldown, setCooldown] = useState(0);
 
   useEffect(() => {
@@ -119,40 +118,61 @@ function ResetPasswordRequestForm({ onBack }: { onBack: () => void }) {
       setError(result.error);
       return;
     }
-    setStep("code");
+    setSent(true);
     setCooldown(RESEND_COOLDOWN_SECONDS);
   }
 
-  async function handleSendEmail(e: FormEvent) {
+  async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     await sendEmail();
-  }
-
-  async function handleVerify(e: FormEvent) {
-    e.preventDefault();
-    const value = code.trim();
-    // Se valida antes de salir a la red: un código a medio escribir no merece
-    // un viaje de ida y vuelta ni el error genérico de Supabase.
-    if (!/^\d{6}$/.test(value) && !/^https?:\/\//i.test(value)) {
-      setError("El código son 6 dígitos, tal como aparece en el email.");
-      return;
-    }
-    setError(null);
-    setSubmitting(true);
-    const result = await verifyRecoveryCode(email, value);
-    setSubmitting(false);
-    // Si sale bien, el contexto marca passwordRecovery y AuthScreen cambia
-    // solo a la pantalla de contraseña nueva.
-    if (result.error) setError(result.error);
   }
 
   return (
     <AuthShell>
       <AuthHeader subtitle="Restablece tu contraseña" />
-      {step === "email" ? (
-        <form className="flex flex-col gap-4" onSubmit={handleSendEmail}>
+      {sent ? (
+        <div className="flex flex-col gap-4">
           <p className="text-sm text-on-surface-variant">
-            Te enviaremos un código de 6 dígitos para que puedas elegir una contraseña nueva.
+            Si existe una cuenta con <span className="text-on-surface">{email}</span>, te llegó un email. Abre el
+            correo y pulsa el enlace: TimeDesk se abrirá aquí mismo para que elijas tu contraseña nueva.
+          </p>
+          <p className="text-xs text-on-surface-variant/70">
+            El enlace caduca en una hora. Deja esta ventana abierta.
+          </p>
+
+          {/* Un enlace caducado o ya usado falla al volver a la app, no al
+              pulsarlo: sin esto, la persona se queda mirando esta pantalla sin
+              saber que algo salió mal. */}
+          {recoveryError && <p className="text-error text-sm">{recoveryError}</p>}
+          {error && <p className="text-error text-sm">{error}</p>}
+
+          <div className="flex flex-col items-center gap-1">
+            <button
+              type="button"
+              disabled={cooldown > 0 || submitting}
+              className="text-on-surface-variant text-xs underline disabled:no-underline disabled:opacity-60"
+              onClick={() => void sendEmail()}
+            >
+              {cooldown > 0 ? `Reenviar en ${cooldown}s` : "Reenviar email"}
+            </button>
+            <button
+              type="button"
+              className="text-on-surface-variant text-xs underline"
+              onClick={() => {
+                setError(null);
+                setSent(false);
+              }}
+            >
+              Usar otro email
+            </button>
+          </div>
+
+          <p className="text-on-surface-variant/70 text-xs text-center">¿No llega? Revisa la carpeta de spam.</p>
+        </div>
+      ) : (
+        <form className="flex flex-col gap-4" onSubmit={handleSubmit}>
+          <p className="text-sm text-on-surface-variant">
+            Te enviaremos un enlace para que elijas una contraseña nueva.
           </p>
           <label className="flex flex-col gap-1 text-sm">
             Email
@@ -171,69 +191,8 @@ function ResetPasswordRequestForm({ onBack }: { onBack: () => void }) {
             disabled={submitting}
             className="mt-2 rounded-full bg-primary-container text-on-primary text-sm font-medium py-2 hover:bg-primary transition-colors disabled:opacity-50"
           >
-            {submitting ? "Enviando..." : "Enviar código"}
+            {submitting ? "Enviando..." : "Enviar enlace"}
           </button>
-        </form>
-      ) : (
-        <form className="flex flex-col gap-4" onSubmit={handleVerify}>
-          <p className="text-sm text-on-surface-variant">
-            Si existe una cuenta con <span className="text-on-surface">{email}</span>, te llegó un email con un
-            código de 6 dígitos. Caduca en una hora.
-          </p>
-          <label className="flex flex-col gap-1 text-sm">
-            Código
-            <input
-              className={`${INPUT_CLASS} text-center text-lg tracking-[0.5em] font-mono`}
-              placeholder="123456"
-              inputMode="numeric"
-              autoComplete="one-time-code"
-              value={code}
-              // Se limpia lo que se pega —espacios, guiones— en vez de
-              // rechazarlo: copiar el código del email arrastra basura a menudo.
-              // Un enlace pegado se deja intacto para la ruta de rescate.
-              onChange={(e) => {
-                const raw = e.target.value;
-                setCode(/^https?:\/\//i.test(raw.trim()) ? raw.trim() : raw.replace(/\D/g, "").slice(0, 6));
-                // El error de un intento anterior no puede seguir en pantalla
-                // mientras se reescribe: parece que el código nuevo ya falló.
-                setError(null);
-              }}
-              required
-              autoFocus
-            />
-          </label>
-          {error && <p className="text-error text-sm">{error}</p>}
-          <button
-            type="submit"
-            disabled={submitting}
-            className="mt-2 rounded-full bg-primary-container text-on-primary text-sm font-medium py-2 hover:bg-primary transition-colors disabled:opacity-50"
-          >
-            {submitting ? "Comprobando..." : "Continuar"}
-          </button>
-
-          <div className="flex flex-col items-center gap-1">
-            <button
-              type="button"
-              disabled={cooldown > 0 || submitting}
-              className="text-on-surface-variant text-xs underline disabled:no-underline disabled:opacity-60"
-              onClick={() => void sendEmail()}
-            >
-              {cooldown > 0 ? `Reenviar código en ${cooldown}s` : "Reenviar código"}
-            </button>
-            <button
-              type="button"
-              className="text-on-surface-variant text-xs underline"
-              onClick={() => {
-                setError(null);
-                setCode("");
-                setStep("email");
-              }}
-            >
-              Usar otro email
-            </button>
-          </div>
-
-          <p className="text-on-surface-variant/70 text-xs text-center">¿No llega? Revisa la carpeta de spam.</p>
         </form>
       )}
       <button type="button" className="text-on-surface-variant text-xs underline self-center" onClick={onBack}>
@@ -242,6 +201,7 @@ function ResetPasswordRequestForm({ onBack }: { onBack: () => void }) {
     </AuthShell>
   );
 }
+
 export function AuthScreen() {
   const { signInWithPassword, signUp, passwordRecovery } = useAuth();
   const [mode, setMode] = useState<"signin" | "signup" | "reset">("signin");

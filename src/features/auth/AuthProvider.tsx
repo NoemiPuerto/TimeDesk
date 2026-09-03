@@ -1,5 +1,6 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
 import type { Session, User } from "@supabase/supabase-js";
+import { onOpenUrl } from "@tauri-apps/plugin-deep-link";
 import { supabase } from "../../lib/supabase";
 
 type AuthContextValue = {
@@ -11,41 +12,58 @@ type AuthContextValue = {
   signUp: (email: string, password: string, displayName: string) => Promise<{ error: string | null }>;
   signOut: () => Promise<void>;
   requestPasswordReset: (email: string) => Promise<{ error: string | null }>;
-  verifyRecoveryCode: (email: string, codeOrLink: string) => Promise<{ error: string | null }>;
+  /** Motivo por el que falló un enlace de recuperación, si falló. */
+  recoveryError: string | null;
   updatePassword: (password: string) => Promise<{ error: string | null }>;
 };
 
 /**
- * TimeDesk es una app de escritorio sin dominio web propio ni deep-link, así
- * que el enlace del email de recuperación no puede "volver" a la ventana de la
- * app. Por eso el flujo es de CÓDIGO: la plantilla de Supabase manda
- * `{{ .Token }}` —seis dígitos— y la persona lo escribe aquí.
+ * Recuperación de contraseña por enlace, con deep link.
  *
- * Se sigue aceptando un enlace pegado, aunque la interfaz no lo ofrezca: hay
- * emails antiguos con el formato viejo circulando hasta que caducan, y esto los
- * rescata sin coste. En cuanto la plantilla nueva esté puesta, esta rama deja
- * de usarse sola.
+ * El enlace del email va a Supabase, que valida el token y redirige a
+ * `timedesk://reset-password#access_token=…`. Ese esquema lo registra la app
+ * (ver `tauri.conf.json` y `tauri-plugin-deep-link`), así que el sistema
+ * devuelve el control a TimeDesk y la ventana aparece en la pantalla de
+ * contraseña nueva. Sin el esquema propio no hay forma de que un navegador
+ * "vuelva" a una app de escritorio sin dominio web.
+ *
+ * Supabase manda el resultado de dos formas según la versión del enlace: la
+ * sesión ya montada en el fragmento (`#access_token`), o un `token_hash` en la
+ * query que hay que canjear. Se contemplan las dos.
  */
-function extractRecoveryToken(input: string): { token?: string; tokenHash?: string; accessToken?: string; refreshToken?: string } {
-  const trimmed = input.trim();
-  if (!/^https?:\/\//i.test(trimmed)) return { token: trimmed };
+/** A donde Supabase devuelve el control tras validar el enlace del email. */
+export const RECOVERY_REDIRECT = "timedesk://reset-password";
 
+type RecoveryPayload =
+  | { kind: "session"; accessToken: string; refreshToken: string }
+  | { kind: "hash"; tokenHash: string }
+  | { kind: "error"; message: string }
+  | null;
+
+function parseRecoveryUrl(input: string): RecoveryPayload {
   let url: URL;
   try {
-    url = new URL(trimmed);
+    url = new URL(input);
   } catch {
-    return { token: trimmed };
+    return null;
   }
 
-  // El enlace ya redirigido trae la sesión en el fragmento (#access_token=...).
   const fragment = new URLSearchParams(url.hash.replace(/^#/, ""));
+  const query = url.searchParams;
+
+  // Supabase avisa de los fallos por aquí (enlace caducado, ya usado). Sin
+  // mirarlo, la app se quedaría esperando en silencio.
+  const errorText = fragment.get("error_description") ?? query.get("error_description");
+  if (errorText) return { kind: "error", message: errorText.replace(/\+/g, " ") };
+
+  // Enlace ya redirigido: la sesión viene montada en el fragmento.
   const accessToken = fragment.get("access_token");
   const refreshToken = fragment.get("refresh_token");
-  if (accessToken && refreshToken) return { accessToken, refreshToken };
+  if (accessToken && refreshToken) return { kind: "session", accessToken, refreshToken };
 
-  // El enlace tal cual viene del email: /auth/v1/verify?token=<hash>&type=recovery
-  const tokenHash = url.searchParams.get("token_hash") ?? url.searchParams.get("token") ?? undefined;
-  return { tokenHash };
+  // Enlace sin redirigir todavía: hay que canjear el hash.
+  const tokenHash = fragment.get("token_hash") ?? query.get("token_hash") ?? query.get("token");
+  return tokenHash ? { kind: "hash", tokenHash } : null;
 }
 
 /**
@@ -72,6 +90,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
   const [passwordRecovery, setPasswordRecovery] = useState(false);
+  const [recoveryError, setRecoveryError] = useState<string | null>(null);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => {
@@ -89,6 +108,67 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     });
 
     return () => subscription.unsubscribe();
+  }, []);
+
+  /**
+   * Enlace de recuperación abierto desde el email.
+   *
+   * `onOpenUrl` se dispara tanto si la app estaba cerrada (el sistema la
+   * arranca con la URL) como si ya estaba abierta —ahí la URL llega vía
+   * single-instance, que la reenvía a la ventana viva en vez de abrir otra—.
+   *
+   * Se registra en su propio efecto y no dentro del de la sesión para que un
+   * fallo al pedir la API de deep link (permiso ausente, plugin no cargado) no
+   * se lleve por delante la carga de la sesión, que es lo que abre la app.
+   */
+  useEffect(() => {
+    let unlisten: (() => void) | undefined;
+    let cancelled = false;
+
+    async function handleUrl(url: string) {
+      const payload = parseRecoveryUrl(url);
+      if (!payload) return;
+
+      if (payload.kind === "error") {
+        setRecoveryError(recoveryErrorMessage(payload.message));
+        return;
+      }
+
+      const { error } =
+        payload.kind === "session"
+          ? await supabase.auth.setSession({
+              access_token: payload.accessToken,
+              refresh_token: payload.refreshToken,
+            })
+          : await supabase.auth.verifyOtp({ token_hash: payload.tokenHash, type: "recovery" });
+
+      if (error) {
+        setRecoveryError(recoveryErrorMessage(error.message));
+        return;
+      }
+      // Canjear el enlace ya deja una sesión válida, así que sin esta marca la
+      // app se abriría directamente y la pantalla de contraseña nueva no
+      // llegaría a verse nunca.
+      setRecoveryError(null);
+      setPasswordRecovery(true);
+    }
+
+    onOpenUrl((urls) => {
+      for (const url of urls) void handleUrl(url);
+    })
+      .then((off) => {
+        if (cancelled) off();
+        else unlisten = off;
+      })
+      .catch(() => {
+        // Fuera del shell de Tauri (el dev server en el navegador) no hay deep
+        // links. No es un fallo: solo no se puede recuperar por enlace ahí.
+      });
+
+    return () => {
+      cancelled = true;
+      unlisten?.();
+    };
   }, []);
 
   async function signInWithPassword(email: string, password: string) {
@@ -110,33 +190,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   async function requestPasswordReset(email: string) {
-    const { error } = await supabase.auth.resetPasswordForEmail(email);
+    // Sin `redirectTo`, Supabase manda al Site URL del proyecto —que aquí no
+    // lleva a ninguna parte— y el token se consume por el camino.
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: RECOVERY_REDIRECT,
+    });
     return { error: error?.message ?? null };
   }
 
-  async function verifyRecoveryCode(email: string, codeOrLink: string) {
-    const parsed = extractRecoveryToken(codeOrLink);
 
-    if (parsed.accessToken && parsed.refreshToken) {
-      const { error } = await supabase.auth.setSession({
-        access_token: parsed.accessToken,
-        refresh_token: parsed.refreshToken,
-      });
-      if (error) return { error: recoveryErrorMessage(error.message) };
-      setPasswordRecovery(true);
-      return { error: null };
-    }
-
-    const { error } = parsed.tokenHash
-      ? await supabase.auth.verifyOtp({ token_hash: parsed.tokenHash, type: "recovery" })
-      : await supabase.auth.verifyOtp({ email, token: parsed.token ?? "", type: "recovery" });
-
-    if (error) return { error: recoveryErrorMessage(error.message) };
-    // verifyOtp emite SIGNED_IN, no PASSWORD_RECOVERY: lo marcamos a mano para
-    // que la pantalla siguiente sea "elige una contraseña nueva" y no la app.
-    setPasswordRecovery(true);
-    return { error: null };
-  }
 
   async function updatePassword(password: string) {
     const { error } = await supabase.auth.updateUser({ password });
@@ -155,7 +217,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         signUp,
         signOut,
         requestPasswordReset,
-        verifyRecoveryCode,
+        recoveryError,
         updatePassword,
       }}
     >
